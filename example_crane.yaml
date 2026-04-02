@@ -1,21 +1,21 @@
 # Tower Crane Jib Calculator - Example Input
 # Flat top tower crane jib modeled as cantilever with varying cross-sections
+# Coordinate system: X=longitudinal, Y=height (positive up), Z=width
 
 crane:
   name: "TC7030-12 Example"
-  jib_length: 60.0        # Total jib length in meters
-  root_position: "left"   # Root (mast connection) at x=0
+  jib_length: 60.0           # Total jib length in meters
 
 sections:
-  # Each section defines a segment of the jib with uniform properties
-  # Sections must cover [0, jib_length] without gaps
+  # Cross-sections along the jib (X axis)
+  # Must cover [0, jib_length] without gaps
   - name: "Root Section (Heavy Truss)"
     start: 0.0
     end: 12.0
-    weight_per_length: 2.8    # kN/m (self-weight)
+    weight_per_length: 2.8    # kN/m (self-weight, acts in -Y)
     area: 0.085               # m² (effective cross-section area)
-    moment_of_inertia: 0.042  # m⁴ (effective I about bending axis)
-    height: 2.6               # m (section depth)
+    moment_of_inertia: 0.042  # m⁴ (I about Z axis, bending in X-Y plane)
+    height: 2.6               # m (Y dimension, depth)
 
   - name: "Mid-Root Section"
     start: 12.0
@@ -49,31 +49,21 @@ sections:
     moment_of_inertia: 0.005
     height: 1.2
 
+# Point loads (max 5)
+# All loads act in -Y direction (downward)
 point_loads:
-  # Concentrated loads (downward = positive)
   - name: "Tip Sheave + Hoist"
-    position: 60.0    # m from root
-    magnitude: 15.0   # kN (downward)
+    position: 60.0    # X position (m from root)
+    magnitude: 15.0   # kN (downward, -Y)
 
-  - name: "Tip Restraining Rope"
-    position: 59.0
-    magnitude: 5.0
+  - name: "Counterweight Connection"
+    position: 0.5
+    magnitude: 8.0
 
-trolley_loads:
-  # Trolley + payload as a movable point load
-  # Calculator will compute for the given position
-  - name: "Trolley + Max Payload"
-    position: 20.0    # m from root (trolley position along jib)
-    trolley_weight: 8.0    # kN
-    payload_weight: 120.0  # kN (max rated capacity)
-    # Combined: 128 kN at position 20.0m
-
-# Optional: sweep trolley positions to find worst case
-trolley_sweep:
-  enabled: true
-  min_position: 3.0    # Minimum trolley distance from root (m)
-  max_position: 58.0   # Maximum trolley distance from tip (m)
-  step: 1.0            # Step size (m)
+# UDLs (max 5) — includes self-weight from sections + any additional distributed loads
+# Self-weight is automatically computed from sections.
+# Use this for additional distributed loads (wind, ice, etc.)
+udls: []
 
 # Analysis settings
 analysis:
@@ -83,3 +73,7 @@ analysis:
     moment: "kN·m"
     stress: "MPa"
     length: "m"
+  coordinate_system:
+    x: "longitudinal (along jib, root at 0)"
+    y: "vertical (positive up, gravity in -Y)"
+    z: "width (perpendicular to bending plane)"
