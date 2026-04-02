@@ -43,7 +43,10 @@ class Section:
     area: float               # m² (effective A)
     moment_of_inertia: float  # m⁴ (I about Z axis)
     height: float             # m (Y dimension, depth)
-    wind_area: float = 0.0    # m² (projected area for wind)
+    wind_area: float = 0.0   # m² (projected area for wind)
+    cg_x: float = 0.0         # X coordinate of CG (m from root)
+    cg_y: float = 0.0         # Y coordinate of CG (m, positive up)
+    cg_z: float = 0.0         # Z coordinate of CG (m)
     truss: Optional[TrussConfig] = None
 
     @property
@@ -57,6 +60,9 @@ class PointLoad:
     position: float  # X position (m from root)
     magnitude: float  # kN (downward, -Y)
     wind_area: float = 0.0  # m² (projected area for wind)
+    cg_x: float = 0.0      # X coordinate of CG
+    cg_y: float = 0.0       # Y coordinate of CG
+    cg_z: float = 0.0       # Z coordinate of CG
 
 
 @dataclass
@@ -66,16 +72,22 @@ class UDL:
     end: float        # X end (m)
     magnitude: float  # kN/m (downward, -Y)
     wind_area: float = 0.0  # m²/m (projected area per meter)
+    cg_x: float = 0.0       # X coordinate of CG (midpoint)
+    cg_y: float = 0.0       # Y coordinate of CG
+    cg_z: float = 0.0       # Z coordinate of CG
 
 
 @dataclass
 class Trolley:
     """Trolley + payload moving along the jib."""
     magnitude: float          # kN (trolley + payload)
-    min_position: float       # m from root (closest to root)
-    max_position: float       # m from root (closest to tip)
-    step: float = 1.0         # m step for envelope computation
+    min_position: float        # m from root (closest to root)
+    max_position: float        # m from root (closest to tip)
+    step: float = 1.0          # m step for envelope computation
     wind_area: float = 0.0    # m² (projected area for wind)
+    cg_x: float = 0.0          # X coordinate of CG
+    cg_y: float = 0.0          # Y coordinate of CG
+    cg_z: float = 0.0          # Z coordinate of CG
 
 
 @dataclass
@@ -94,13 +106,14 @@ class LoadCase:
 class CraneModel:
     name: str
     jib_length: float
-    sections: list[Section]
-    point_loads: list[PointLoad]
-    udls: list[UDL]
+    jib_height_position: float = 0.0  # Y coordinate of jib reference (m, e.g., mast top elevation)
     youngs_modulus: float = DEFAULT_E
+    sections: list[Section] = field(default_factory=list)
+    point_loads: list[PointLoad] = field(default_factory=list)
+    udls: list[UDL] = field(default_factory=list)
     num_points: int = 500
-    trolley: Optional[Trolley] = None  # None = no trolley
-    load_cases: list[LoadCase] = field(default_factory=list)  # empty = single default case
+    trolley: Optional[Trolley] = None
+    load_cases: list[LoadCase] = field(default_factory=list)
 
 
 # ── Analysis results ─────────────────────────────────────────────────────

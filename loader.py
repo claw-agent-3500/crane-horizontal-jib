@@ -31,17 +31,26 @@ def _parse_section(data: dict) -> Section:
     truss_data = data.pop('truss', None)
     truss = _parse_truss(truss_data) if truss_data else None
     wind_area = data.pop('wind_area', 0.0)
-    return Section(**data, truss=truss, wind_area=wind_area)
+    cg_x = data.pop('cg_x', 0.0)
+    cg_y = data.pop('cg_y', 0.0)
+    cg_z = data.pop('cg_z', 0.0)
+    return Section(**data, truss=truss, wind_area=wind_area, cg_x=cg_x, cg_y=cg_y, cg_z=cg_z)
 
 
 def _parse_point_load(data: dict) -> PointLoad:
     wind_area = data.pop('wind_area', 0.0)
-    return PointLoad(**data, wind_area=wind_area)
+    cg_x = data.pop('cg_x', 0.0)
+    cg_y = data.pop('cg_y', 0.0)
+    cg_z = data.pop('cg_z', 0.0)
+    return PointLoad(**data, wind_area=wind_area, cg_x=cg_x, cg_y=cg_y, cg_z=cg_z)
 
 
 def _parse_udl(data: dict) -> UDL:
     wind_area = data.pop('wind_area', 0.0)
-    return UDL(**data, wind_area=wind_area)
+    cg_x = data.pop('cg_x', 0.0)
+    cg_y = data.pop('cg_y', 0.0)
+    cg_z = data.pop('cg_z', 0.0)
+    return UDL(**data, wind_area=wind_area, cg_x=cg_x, cg_y=cg_y, cg_z=cg_z)
 
 
 def load_model(path: str) -> CraneModel:
@@ -66,6 +75,9 @@ def load_model(path: str) -> CraneModel:
             max_position=ts_data['max_position'],
             step=ts_data.get('step', 1.0),
             wind_area=ts_data.get('wind_area', 0.0),
+            cg_x=ts_data.get('cg_x', 0.0),
+            cg_y=ts_data.get('cg_y', 0.0),
+            cg_z=ts_data.get('cg_z', 0.0),
         )
 
     # Load cases
@@ -84,6 +96,7 @@ def load_model(path: str) -> CraneModel:
     return CraneModel(
         name=crane['name'],
         jib_length=crane['jib_length'],
+        jib_height_position=crane.get('jib_height_position', 0.0),
         sections=sections,
         point_loads=point_loads,
         udls=udls,
