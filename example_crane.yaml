@@ -1,0 +1,85 @@
+# Tower Crane Jib Calculator - Example Input
+# Flat top tower crane jib modeled as cantilever with varying cross-sections
+
+crane:
+  name: "TC7030-12 Example"
+  jib_length: 60.0        # Total jib length in meters
+  root_position: "left"   # Root (mast connection) at x=0
+
+sections:
+  # Each section defines a segment of the jib with uniform properties
+  # Sections must cover [0, jib_length] without gaps
+  - name: "Root Section (Heavy Truss)"
+    start: 0.0
+    end: 12.0
+    weight_per_length: 2.8    # kN/m (self-weight)
+    area: 0.085               # m² (effective cross-section area)
+    moment_of_inertia: 0.042  # m⁴ (effective I about bending axis)
+    height: 2.6               # m (section depth)
+
+  - name: "Mid-Root Section"
+    start: 12.0
+    end: 24.0
+    weight_per_length: 2.2
+    area: 0.068
+    moment_of_inertia: 0.031
+    height: 2.2
+
+  - name: "Mid Section"
+    start: 24.0
+    end: 40.0
+    weight_per_length: 1.6
+    area: 0.048
+    moment_of_inertia: 0.018
+    height: 1.8
+
+  - name: "Tip Section (Light Truss)"
+    start: 40.0
+    end: 55.0
+    weight_per_length: 1.0
+    area: 0.032
+    moment_of_inertia: 0.009
+    height: 1.4
+
+  - name: "Tip Assembly"
+    start: 55.0
+    end: 60.0
+    weight_per_length: 0.8
+    area: 0.025
+    moment_of_inertia: 0.005
+    height: 1.2
+
+point_loads:
+  # Concentrated loads (downward = positive)
+  - name: "Tip Sheave + Hoist"
+    position: 60.0    # m from root
+    magnitude: 15.0   # kN (downward)
+
+  - name: "Tip Restraining Rope"
+    position: 59.0
+    magnitude: 5.0
+
+trolley_loads:
+  # Trolley + payload as a movable point load
+  # Calculator will compute for the given position
+  - name: "Trolley + Max Payload"
+    position: 20.0    # m from root (trolley position along jib)
+    trolley_weight: 8.0    # kN
+    payload_weight: 120.0  # kN (max rated capacity)
+    # Combined: 128 kN at position 20.0m
+
+# Optional: sweep trolley positions to find worst case
+trolley_sweep:
+  enabled: true
+  min_position: 3.0    # Minimum trolley distance from root (m)
+  max_position: 58.0   # Maximum trolley distance from tip (m)
+  step: 1.0            # Step size (m)
+
+# Analysis settings
+analysis:
+  num_points: 500       # Number of points along jib for diagrams
+  units:
+    force: "kN"
+    moment: "kN·m"
+    stress: "MPa"
+    length: "m"
