@@ -108,3 +108,49 @@ Before any rebuild, list existing features and mark each as keep/modify/remove. 
 - Tags: rebuild, regression-prevention
 
 ---
+
+## [LRN-20260402-003] best_practice
+
+**Logged**: 2026-04-02T11:54:57Z
+**Priority**: high
+**Status**: pending
+**Area**: backend
+
+### Summary
+Trolley sweep restored with trolley_mag parameter fix
+
+### Details
+Restored trolley sweep as optional analysis mode. Fixed root cause (ERR-20260402-001) by passing trolley_mag explicitly. Now produces worst-case moment, shear, and deflection across trolley positions.
+
+### Suggested Action
+Keep sweep as opt-in secondary analysis. Primary output stays 1 load case.
+
+### Metadata
+- Source: conversation
+- Tags: trolley-sweep, restored
+- See Also: ERR-20260402-001, LRN-20260402-001
+
+---
+
+## [LRN-20260402-004] best_practice
+
+**Logged**: 2026-04-02T11:54:57Z
+**Priority**: high
+**Status**: pending
+**Area**: backend
+
+### Summary
+Deflection via double integration of M/(EI)
+
+### Details
+Added deflection calculation using cumulative trapezoidal integration. θ(x) = ∫M/(EI)dx, δ(x) = ∫θ(x)dx with θ(0)=0, δ(0)=0. Added L/250 serviceability check and deflection plot to report.
+
+### Suggested Action
+Always include deflection in structural reports. Check against L/250 and L/400 limits.
+
+### Metadata
+- Source: conversation
+- Tags: deflection, serviceability
+- See Also: FEAT-20260402-001
+
+---

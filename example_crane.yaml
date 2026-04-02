@@ -4,18 +4,17 @@
 
 crane:
   name: "TC7030-12 Example"
-  jib_length: 60.0           # Total jib length in meters
+  jib_length: 60.0             # Total jib length (m)
+  youngs_modulus: 200000000.0  # kN/m² (200 GPa steel)
 
 sections:
-  # Cross-sections along the jib (X axis)
-  # Must cover [0, jib_length] without gaps
   - name: "Root Section (Heavy Truss)"
     start: 0.0
     end: 12.0
-    weight_per_length: 2.8    # kN/m (self-weight, acts in -Y)
-    area: 0.085               # m² (effective cross-section area)
-    moment_of_inertia: 0.042  # m⁴ (I about Z axis, bending in X-Y plane)
-    height: 2.6               # m (Y dimension, depth)
+    weight_per_length: 2.8
+    area: 0.085
+    moment_of_inertia: 0.042
+    height: 2.6
 
   - name: "Mid-Root Section"
     start: 12.0
@@ -50,29 +49,35 @@ sections:
     height: 1.2
 
 # Point loads (max 5)
-# All loads act in -Y direction (downward)
 point_loads:
   - name: "Tip Sheave + Hoist"
-    position: 60.0    # X position (m from root)
-    magnitude: 15.0   # kN (downward, -Y)
+    position: 60.0
+    magnitude: 15.0
 
   - name: "Counterweight Connection"
     position: 0.5
     magnitude: 8.0
 
-# UDLs (max 5) — includes self-weight from sections + any additional distributed loads
-# Self-weight is automatically computed from sections.
-# Use this for additional distributed loads (wind, ice, etc.)
+# UDLs (max 5) — additional distributed loads beyond section self-weights
 udls: []
+
+# Trolley sweep — finds worst-case trolley position
+trolley_sweep:
+  enabled: true
+  magnitude: 128.0    # kN (trolley + max payload)
+  min_position: 3.0
+  max_position: 58.0
+  step: 1.0
 
 # Analysis settings
 analysis:
-  num_points: 500       # Number of points along jib for diagrams
+  num_points: 500
   units:
     force: "kN"
     moment: "kN·m"
     stress: "MPa"
     length: "m"
+    deflection: "mm"
   coordinate_system:
     x: "longitudinal (along jib, root at 0)"
     y: "vertical (positive up, gravity in -Y)"

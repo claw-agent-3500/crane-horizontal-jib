@@ -3,8 +3,8 @@
 Flat Top Tower Crane Jib Calculator
 =====================================
 Models a flat-top tower crane jib as a cantilever beam with varying
-cross-sections. Computes shear force diagrams (SFD) and bending moment
-diagrams (BMD) along the X axis.
+cross-sections. Computes shear force, bending moment, deflection,
+and stress diagrams along the X axis.
 
 Coordinate system:
   X = longitudinal (along jib, root at x=0)
@@ -14,7 +14,7 @@ Coordinate system:
 Constraints:
   - Max 5 point loads
   - Max 5 UDLs (in addition to section self-weights)
-  - 1 load case only (MVP)
+  - 1 load case only (MVP), with optional trolley sweep
 
 Usage:
     python3 crane_calc.py input.yaml [--output report.html] [--no-browser]
@@ -24,7 +24,7 @@ import argparse
 import io
 import base64
 import sys
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
@@ -37,6 +37,7 @@ import yaml
 
 MAX_POINT_LOADS = 5
 MAX_UDLS = 5
+DEFAULT_E = 200e6  # kN/m² (200 GPa steel)
 
 
 # ── Data classes ──────────────────────────────────────────────────────────
@@ -44,12 +45,12 @@ MAX_UDLS = 5
 @dataclass
 class Section:
     name: str
-    start: float          # X start (m)
-    end: float            # X end (m)
+    start: float              # X start (m)
+    end: float                # X end (m)
     weight_per_length: float  # kN/m (self-weight, acts in -Y)
-    area: float           # m² (effective A)
+    area: float               # m² (effective A)
     moment_of_inertia: float  # m⁴ (I about Z axis)
-    height: float         # m (Y dimension, depth)
+    height: float             # m (Y dimension, depth)
 
     @property
     def length(self) -> float:
@@ -72,13 +73,23 @@ class UDL:
 
 
 @dataclass
+class TrolleySweep:
+    magnitude: float          # kN (trolley + payload)
+    min_position: float = 3.0
+    max_position: float = 0.0  # 0 = auto (jib_length - 2m)
+    step: float = 1.0
+
+
+@dataclass
 class CraneModel:
     name: str
     jib_length: float
     sections: list[Section]
     point_loads: list[PointLoad]
     udls: list[UDL]
+    youngs_modulus: float = DEFAULT_E  # kN/m²
     num_points: int = 500
+    trolley_sweep: Optional[TrolleySweep] = None
 
 
 @dataclass
@@ -86,6 +97,8 @@ class AnalysisResult:
     x: np.ndarray
     V: np.ndarray          # Shear force (kN)
     M: np.ndarray          # Bending moment (kN·m)
+    theta: np.ndarray      # Slope (rad)
+    delta: np.ndarray      # Deflection (m, positive = downward)
     sigma: np.ndarray      # Bending stress (MPa)
     tau: np.ndarray         # Shear stress (MPa)
     reaction_V: float      # Root shear (kN)
@@ -96,23 +109,35 @@ class AnalysisResult:
     max_M_pos: float
     max_sigma: float
     max_sigma_pos: float
+    max_delta: float
+    max_delta_pos: float
+    tip_delta: float
     sections: list[Section]
     model: CraneModel
+
+
+@dataclass
+class SweepResult:
+    positions: np.ndarray
+    root_moments: np.ndarray
+    root_shears: np.ndarray
+    tip_deflections: np.ndarray
+    worst_position: float
+    worst_moment: float
+    worst_shear: float
+    worst_deflection: float
 
 
 # ── Validation ────────────────────────────────────────────────────────────
 
 def validate_model(model: CraneModel) -> list[str]:
-    """Validate model constraints and return list of warnings/errors."""
     errors = []
 
     if len(model.point_loads) > MAX_POINT_LOADS:
         errors.append(f"Too many point loads: {len(model.point_loads)} (max {MAX_POINT_LOADS})")
-
     if len(model.udls) > MAX_UDLS:
         errors.append(f"Too many UDLs: {len(model.udls)} (max {MAX_UDLS})")
 
-    # Check sections cover [0, jib_length]
     sorted_secs = sorted(model.sections, key=lambda s: s.start)
     if sorted_secs[0].start != 0:
         errors.append(f"First section starts at {sorted_secs[0].start}, must be 0")
@@ -124,109 +149,170 @@ def validate_model(model: CraneModel) -> list[str]:
         if abs(gap) > 1e-6:
             errors.append(f"Gap between sections at X={sorted_secs[i].end:.1f} to {sorted_secs[i+1].start:.1f}")
 
-    # Check load positions are within jib
     for pl in model.point_loads:
         if pl.position < 0 or pl.position > model.jib_length:
-            errors.append(f"Point load '{pl.name}' at X={pl.position} is outside jib [0, {model.jib_length}]")
+            errors.append(f"Point load '{pl.name}' at X={pl.position} outside jib [0, {model.jib_length}]")
 
     for udl in model.udls:
         if udl.start < 0 or udl.end > model.jib_length:
-            errors.append(f"UDL '{udl.name}' [{udl.start}, {udl.end}] is outside jib [0, {model.jib_length}]")
+            errors.append(f"UDL '{udl.name}' [{udl.start}, {udl.end}] outside jib [0, {model.jib_length}]")
         if udl.start >= udl.end:
             errors.append(f"UDL '{udl.name}' has start >= end")
+
+    if model.youngs_modulus <= 0:
+        errors.append(f"Young's modulus must be positive, got {model.youngs_modulus}")
 
     return errors
 
 
 # ── Core calculation ──────────────────────────────────────────────────────
 
-def compute_sfd_bmd(model: CraneModel) -> AnalysisResult:
-    """
-    Compute SFD and BMD for a cantilever jib (root at X=0, free tip at X=L).
-
-    Coordinate system: X along jib, Y positive up.
-    All loads act in -Y (downward).
-
-    Sign convention (right-portion approach):
-      V(x) = sum of all downward (-Y) loads to the right of x
-             → V is positive for downward loads on the right portion
-      M(x) = hogging moment about the cut at x
-             → M is positive (tension on top fiber for cantilever)
-    """
+def _compute_loads(model: CraneModel, trolley_pos: Optional[float] = None,
+                   trolley_mag: Optional[float] = None) -> tuple[np.ndarray, np.ndarray]:
+    """Compute V(x) and M(x) arrays. Returns (x, V, M)."""
     L = model.jib_length
     x = np.linspace(0, L, model.num_points)
-
     V = np.zeros_like(x)
     M = np.zeros_like(x)
 
     for i, xi in enumerate(x):
-        # ── Section self-weights (UDL) to the right of xi ──
+        # Section self-weights
         for sec in model.sections:
             if sec.start >= xi:
-                length_in = sec.length
-                d_start = sec.start - xi
-                d_end = sec.end - xi
+                length_in, d_start, d_end = sec.length, sec.start - xi, sec.end - xi
             elif sec.end > xi:
-                length_in = sec.end - xi
-                d_start = 0.0
-                d_end = sec.end - xi
+                length_in, d_start, d_end = sec.end - xi, 0.0, sec.end - xi
             else:
                 continue
-
             w = sec.weight_per_length
             V[i] += w * length_in
             M[i] += w * (d_end**2 - d_start**2) / 2.0
 
-        # ── Additional UDLs to the right of xi ──
+        # Additional UDLs
         for udl in model.udls:
             if udl.start >= xi:
-                length_in = udl.end - udl.start
-                d_start = udl.start - xi
-                d_end = udl.end - xi
+                length_in, d_start, d_end = udl.end - udl.start, udl.start - xi, udl.end - xi
             elif udl.end > xi:
-                length_in = udl.end - xi
-                d_start = 0.0
-                d_end = udl.end - xi
+                length_in, d_start, d_end = udl.end - xi, 0.0, udl.end - xi
             else:
                 continue
-
             w = udl.magnitude
             V[i] += w * length_in
             M[i] += w * (d_end**2 - d_start**2) / 2.0
 
-        # ── Point loads to the right of xi ──
+        # Point loads
         for pl in model.point_loads:
             if pl.position > xi:
                 V[i] += pl.magnitude
                 M[i] += pl.magnitude * (pl.position - xi)
 
-    # ── Section properties at each x point ──
+        # Trolley load
+        tp = trolley_pos if trolley_pos is not None else None
+        if tp is not None and tp > xi:
+            mag = trolley_mag if trolley_mag is not None else 0
+            V[i] += mag
+            M[i] += mag * (tp - xi)
+
+    return x, V, M
+
+
+def _compute_deflection(x: np.ndarray, M: np.ndarray, model: CraneModel) -> tuple[np.ndarray, np.ndarray]:
+    """
+    Compute slope θ(x) and deflection δ(x) by double integration of M/(EI).
+
+    Boundary conditions: θ(0) = 0, δ(0) = 0 (cantilever fixed at root).
+    Deflection is positive downward (-Y direction).
+    """
+    n = len(x)
+    dx = x[1] - x[0]
+
+    # Get EI at each point
+    EI = np.zeros(n)
+    for j, xj in enumerate(x):
+        sec = _get_section_at(model.sections, xj)
+        EI[j] = model.youngs_modulus * sec.moment_of_inertia if sec else 0
+
+    # Curvature: κ = M / EI
+    curvature = np.where(EI > 0, M / EI, 0)
+
+    # First integration: θ(x) = ∫₀ˣ κ(ξ) dξ
+    theta = np.zeros(n)
+    for j in range(1, n):
+        theta[j] = theta[j - 1] + (curvature[j - 1] + curvature[j]) * dx / 2.0
+
+    # Second integration: δ(x) = ∫₀ˣ θ(ξ) dξ
+    delta = np.zeros(n)
+    for j in range(1, n):
+        delta[j] = delta[j - 1] + (theta[j - 1] + theta[j]) * dx / 2.0
+
+    return theta, delta
+
+
+def compute_sfd_bmd(model: CraneModel, trolley_pos: Optional[float] = None,
+                    trolley_mag: Optional[float] = None) -> AnalysisResult:
+    """
+    Full analysis: SFD, BMD, deflection, stress.
+    Optional trolley load override for sweep mode.
+    """
+    x, V, M = _compute_loads(model, trolley_pos, trolley_mag)
+    theta, delta = _compute_deflection(x, M, model)
+
+    # Stresses
     sigma = np.zeros_like(x)
     tau = np.zeros_like(x)
     for j, xj in enumerate(x):
         sec = _get_section_at(model.sections, xj)
         if sec:
-            c = sec.height / 2.0  # distance to extreme fiber (Y direction)
+            c = sec.height / 2.0
             I = sec.moment_of_inertia
             A = sec.area
-            # σ = M*c/I (kN·m * m / m⁴ = kN/m²)
-            # Convert to MPa: kN/m² / 1000
-            sigma[j] = (M[j] * c / I / 1000.0) if I > 0 else 0
-            # τ = V/A (average shear stress)
+            sigma[j] = (M[j] * c / I / 1000.0) if I > 0 else 0  # kN/m² → MPa
             tau[j] = (V[j] / A / 1000.0) if A > 0 else 0
 
     max_V_idx = np.argmax(np.abs(V))
     max_M_idx = np.argmax(M)
     max_sigma_idx = np.argmax(sigma)
+    max_delta_idx = np.argmax(delta)
 
     return AnalysisResult(
-        x=x, V=V, M=M, sigma=sigma, tau=tau,
+        x=x, V=V, M=M, theta=theta, delta=delta, sigma=sigma, tau=tau,
         reaction_V=V[0], reaction_M=M[0],
         max_V=np.max(np.abs(V)), max_V_pos=x[max_V_idx],
         max_M=np.max(M), max_M_pos=x[max_M_idx],
         max_sigma=np.max(sigma), max_sigma_pos=x[max_sigma_idx],
+        max_delta=np.max(delta), max_delta_pos=x[max_delta_idx],
+        tip_delta=delta[-1],
         sections=model.sections,
         model=model,
+    )
+
+
+def sweep_trolley(model: CraneModel) -> SweepResult:
+    """Sweep trolley position to find worst-case loads and deflection."""
+    sweep = model.trolley_sweep
+    pos_max = sweep.max_position if sweep.max_position > 0 else model.jib_length - 2.0
+    positions = np.arange(sweep.min_position, pos_max + sweep.step / 2, sweep.step)
+
+    root_moments = np.zeros_like(positions)
+    root_shears = np.zeros_like(positions)
+    tip_deflections = np.zeros_like(positions)
+
+    for i, pos in enumerate(positions):
+        result = compute_sfd_bmd(model, trolley_pos=pos, trolley_mag=sweep.magnitude)
+        root_moments[i] = result.reaction_M
+        root_shears[i] = result.reaction_V
+        tip_deflections[i] = result.tip_delta
+
+    worst_idx = np.argmax(root_moments)
+    return SweepResult(
+        positions=positions,
+        root_moments=root_moments,
+        root_shears=root_shears,
+        tip_deflections=tip_deflections,
+        worst_position=positions[worst_idx],
+        worst_moment=root_moments[worst_idx],
+        worst_shear=root_shears[worst_idx],
+        worst_deflection=tip_deflections[worst_idx],
     )
 
 
@@ -274,17 +360,14 @@ def _section_bands(ax, sections: list[Section], ymin: float, ymax: float):
 def plot_sfd(result: AnalysisResult) -> str:
     fig, ax = plt.subplots(figsize=(12, 3.5))
     fig.patch.set_facecolor('#1e1e2e')
-
     _section_bands(ax, result.sections, 0, result.max_V * 1.15)
     ax.fill_between(result.x, result.V, alpha=0.4, color='#f38ba8', zorder=2)
     ax.plot(result.x, result.V, color='#f38ba8', linewidth=1.5, zorder=3)
     _style_ax(ax, 'V(x) Shear Force (kN)', '#f38ba8')
     ax.set_title('Shear Force Diagram (SFD)', color='#cdd6f4', fontsize=12, fontweight='bold')
-
     ax.annotate(f'Max |V| = {result.max_V:.1f} kN\nat X = {result.max_V_pos:.1f} m',
                 xy=(result.max_V_pos, result.V[np.argmin(np.abs(result.x - result.max_V_pos))]),
-                xytext=(20, 20), textcoords='offset points',
-                color='#f38ba8', fontsize=8,
+                xytext=(20, 20), textcoords='offset points', color='#f38ba8', fontsize=8,
                 arrowprops=dict(arrowstyle='->', color='#f38ba8', lw=0.8))
     return _fig_to_base64(fig)
 
@@ -292,25 +375,44 @@ def plot_sfd(result: AnalysisResult) -> str:
 def plot_bmd(result: AnalysisResult) -> str:
     fig, ax = plt.subplots(figsize=(12, 3.5))
     fig.patch.set_facecolor('#1e1e2e')
-
     _section_bands(ax, result.sections, 0, result.max_M * 1.15)
     ax.fill_between(result.x, result.M, alpha=0.4, color='#a6e3a1', zorder=2)
     ax.plot(result.x, result.M, color='#a6e3a1', linewidth=1.5, zorder=3)
     _style_ax(ax, 'M(x) Bending Moment (kN·m)', '#a6e3a1')
     ax.set_title('Bending Moment Diagram (BMD)', color='#cdd6f4', fontsize=12, fontweight='bold')
-
     ax.annotate(f'Max M = {result.max_M:.1f} kN·m\nat X = {result.max_M_pos:.1f} m',
-                xy=(result.max_M_pos, result.max_M),
-                xytext=(20, -30), textcoords='offset points',
-                color='#a6e3a1', fontsize=8,
+                xy=(result.max_M_pos, result.max_M), xytext=(20, -30),
+                textcoords='offset points', color='#a6e3a1', fontsize=8,
                 arrowprops=dict(arrowstyle='->', color='#a6e3a1', lw=0.8))
+    return _fig_to_base64(fig)
+
+
+def plot_deflection(result: AnalysisResult) -> str:
+    fig, ax = plt.subplots(figsize=(12, 3.5))
+    fig.patch.set_facecolor('#1e1e2e')
+    delta_mm = result.delta * 1000  # convert to mm
+    max_mm = delta_mm.max() if delta_mm.max() > 0 else 1
+    _section_bands(ax, result.sections, 0, max_mm * 1.15)
+    ax.fill_between(result.x, delta_mm, alpha=0.4, color='#cba6f7', zorder=2)
+    ax.plot(result.x, delta_mm, color='#cba6f7', linewidth=1.5, zorder=3)
+    _style_ax(ax, 'δ(x) Deflection (mm)', '#cba6f7')
+    ax.set_title('Deflection Curve (downward = positive)', color='#cdd6f4', fontsize=12, fontweight='bold')
+    ax.annotate(f'Tip δ = {result.tip_delta * 1000:.1f} mm\nat X = {result.x[-1]:.1f} m',
+                xy=(result.x[-1], delta_mm[-1]), xytext=(-80, -30),
+                textcoords='offset points', color='#cba6f7', fontsize=8,
+                arrowprops=dict(arrowstyle='->', color='#cba6f7', lw=0.8))
+    # Serviceability limit line
+    L = result.model.jib_length
+    limit_mm = L * 1000 / 250  # L/250 typical
+    ax.axhline(y=limit_mm, color='#f38ba8', linestyle='--', linewidth=0.8, alpha=0.6, zorder=1)
+    ax.text(result.x[-1] * 0.98, limit_mm * 1.05, f'L/250 = {limit_mm:.0f} mm',
+            ha='right', va='bottom', fontsize=7, color='#f38ba8', alpha=0.7)
     return _fig_to_base64(fig)
 
 
 def plot_stress(result: AnalysisResult) -> str:
     fig, ax = plt.subplots(figsize=(12, 3.5))
     fig.patch.set_facecolor('#1e1e2e')
-
     _section_bands(ax, result.sections, 0, result.max_sigma * 1.15)
     ax.fill_between(result.x, result.sigma, alpha=0.3, color='#89b4fa', label='Bending σ', zorder=2)
     ax.plot(result.x, result.sigma, color='#89b4fa', linewidth=1.5, label='Bending σ', zorder=3)
@@ -319,13 +421,11 @@ def plot_stress(result: AnalysisResult) -> str:
             linestyle='--', label='Shear τ (avg)', zorder=3)
     _style_ax(ax, 'Stress (MPa)', '#cdd6f4')
     ax.set_title('Stress Distribution along X', color='#cdd6f4', fontsize=12, fontweight='bold')
-    ax.legend(fontsize=8, facecolor='#1e1e2e', edgecolor='#555',
-              labelcolor='#cdd6f4', loc='upper right')
+    ax.legend(fontsize=8, facecolor='#1e1e2e', edgecolor='#555', labelcolor='#cdd6f4', loc='upper right')
     return _fig_to_base64(fig)
 
 
 def plot_schematic(model: CraneModel) -> str:
-    """Draw a side view (X-Y plane) schematic of the jib."""
     fig, ax = plt.subplots(figsize=(12, 2.5))
     fig.patch.set_facecolor('#1e1e2e')
     ax.set_facecolor('#1e1e2e')
@@ -346,16 +446,12 @@ def plot_schematic(model: CraneModel) -> str:
         ax.text(mid, -h/2 - 0.15, f'{sec.weight_per_length} kN/m',
                 ha='center', va='top', fontsize=7, color='#aaa')
 
-    # Point loads (arrows pointing down = -Y)
     for pl in model.point_loads:
-        arrow_y_top = -2.2
-        arrow_y_bot = -2.8
-        ax.annotate('', xy=(pl.position, arrow_y_bot), xytext=(pl.position, arrow_y_top),
+        ax.annotate('', xy=(pl.position, -2.8), xytext=(pl.position, -2.2),
                     arrowprops=dict(arrowstyle='->', color='#f38ba8', lw=1.5))
         ax.text(pl.position, -3.0, f'{pl.name}\n{pl.magnitude} kN',
                 ha='center', va='top', fontsize=6, color='#f38ba8')
 
-    # UDLs
     for udl in model.udls:
         mid = (udl.start + udl.end) / 2
         ax.annotate('', xy=(mid, -2.8), xytext=(mid, -2.2),
@@ -363,12 +459,9 @@ def plot_schematic(model: CraneModel) -> str:
         ax.text(mid, -3.0, f'{udl.name}\n{udl.magnitude} kN/m [{udl.start:.0f}-{udl.end:.0f}]',
                 ha='center', va='top', fontsize=6, color='#f9e2af')
 
-    # Root marker
     ax.annotate('FIXED\n(ROOT)\nX = 0', xy=(0, 0), xytext=(-3, 0),
                 fontsize=7, color='#cdd6f4', ha='center', va='center',
                 arrowprops=dict(arrowstyle='->', color='#cdd6f4', lw=1.2))
-
-    # Coordinate axes
     ax.annotate('X →', xy=(model.jib_length * 0.95, 1.8), fontsize=7, color='#6c7086', ha='center')
     ax.annotate('Y ↑', xy=(-1.5, 1.5), fontsize=7, color='#6c7086', ha='center')
 
@@ -385,16 +478,54 @@ def plot_schematic(model: CraneModel) -> str:
         ax.spines[spine].set_color('#555')
     ax.set_aspect('auto')
     ax.grid(True, alpha=0.1, color='#888')
+    return _fig_to_base64(fig)
 
+
+def plot_sweep(sweep: SweepResult) -> str:
+    fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(12, 8), sharex=True)
+    fig.patch.set_facecolor('#1e1e2e')
+
+    for ax in (ax1, ax2, ax3):
+        ax.set_facecolor('#1e1e2e')
+        ax.tick_params(colors='#aaa', labelsize=8)
+        for spine in ('top', 'right'):
+            ax.spines[spine].set_visible(False)
+        for spine in ('bottom', 'left'):
+            ax.spines[spine].set_color('#555')
+        ax.grid(True, alpha=0.15, color='#888')
+        ax.axvline(sweep.worst_position, color='#f38ba8', linestyle='--', alpha=0.5, linewidth=0.8)
+
+    # Root moment
+    ax1.plot(sweep.positions, sweep.root_moments, color='#a6e3a1', linewidth=1.5)
+    ax1.scatter([sweep.worst_position], [sweep.worst_moment], color='#f38ba8', s=40, zorder=5)
+    ax1.set_ylabel('Root Moment (kN·m)', color='#a6e3a1', fontsize=10)
+    ax1.set_title('Trolley Position Sweep — Worst Case Analysis', color='#cdd6f4',
+                  fontsize=12, fontweight='bold')
+    ax1.annotate(f'Worst: {sweep.worst_moment:.1f} kN·m @ {sweep.worst_position:.1f} m',
+                 xy=(sweep.worst_position, sweep.worst_moment), xytext=(20, 0),
+                 textcoords='offset points', color='#f38ba8', fontsize=8)
+
+    # Root shear
+    ax2.plot(sweep.positions, sweep.root_shears, color='#f38ba8', linewidth=1.5)
+    ax2.set_ylabel('Root Shear (kN)', color='#f38ba8', fontsize=10)
+
+    # Tip deflection
+    ax3.plot(sweep.positions, sweep.tip_deflections * 1000, color='#cba6f7', linewidth=1.5)
+    ax3.set_ylabel('Tip Deflection (mm)', color='#cba6f7', fontsize=10)
+    ax3.set_xlabel('Trolley Position (m from root)', color='#cdd6f4', fontsize=10)
+
+    fig.tight_layout()
     return _fig_to_base64(fig)
 
 
 # ── HTML Report ───────────────────────────────────────────────────────────
 
-def generate_html(model: CraneModel, result: AnalysisResult) -> str:
+def generate_html(model: CraneModel, result: AnalysisResult,
+                  sweep_result: Optional[SweepResult] = None) -> str:
     schematic_b64 = plot_schematic(model)
     sfd_b64 = plot_sfd(result)
     bmd_b64 = plot_bmd(result)
+    deflection_b64 = plot_deflection(result)
     stress_b64 = plot_stress(result)
 
     sec_at_max = _get_section_at(model.sections, result.max_sigma_pos)
@@ -416,7 +547,6 @@ def generate_html(model: CraneModel, result: AnalysisResult) -> str:
 
     # Loads table
     load_rows = ''
-    # Section self-weights
     for sec in model.sections:
         load_rows += f'''
         <tr>
@@ -425,7 +555,6 @@ def generate_html(model: CraneModel, result: AnalysisResult) -> str:
             <td>{sec.weight_per_length:.2f} kN/m</td>
             <td>−Y (down)</td>
         </tr>'''
-    # Additional UDLs
     for udl in model.udls:
         load_rows += f'''
         <tr>
@@ -434,7 +563,6 @@ def generate_html(model: CraneModel, result: AnalysisResult) -> str:
             <td>{udl.magnitude:.2f} kN/m</td>
             <td>−Y (down)</td>
         </tr>'''
-    # Point loads
     for pl in model.point_loads:
         load_rows += f'''
         <tr>
@@ -443,6 +571,41 @@ def generate_html(model: CraneModel, result: AnalysisResult) -> str:
             <td>{pl.magnitude:.1f} kN</td>
             <td>−Y (down)</td>
         </tr>'''
+
+    # Deflection serviceability check
+    L = model.jib_length
+    limit_250 = L * 1000 / 250
+    limit_400 = L * 1000 / 400
+    tip_mm = result.tip_delta * 1000
+    defl_status = '✅' if tip_mm < limit_250 else ('⚠️' if tip_mm < limit_400 else '❌')
+
+    # Trolley sweep section
+    sweep_html = ''
+    if sweep_result:
+        sweep_b64 = plot_sweep(sweep_result)
+        sweep_html = f'''
+    <div class="card">
+        <h2>🔄 Trolley Position Sweep</h2>
+        <div class="stats">
+            <div class="stat">
+                <div class="stat-label">Worst Trolley Position</div>
+                <div class="stat-value">{sweep_result.worst_position:.1f} m</div>
+            </div>
+            <div class="stat">
+                <div class="stat-label">Max Root Moment</div>
+                <div class="stat-value moment">{sweep_result.worst_moment:.1f} kN·m</div>
+            </div>
+            <div class="stat">
+                <div class="stat-label">Max Root Shear</div>
+                <div class="stat-value shear">{sweep_result.worst_shear:.1f} kN</div>
+            </div>
+            <div class="stat">
+                <div class="stat-label">Max Tip Deflection</div>
+                <div class="stat-value" style="color:#cba6f7">{sweep_result.worst_deflection * 1000:.1f} mm</div>
+            </div>
+        </div>
+        <img src="data:image/png;base64,{sweep_b64}" alt="Trolley Sweep" />
+    </div>'''
 
     return f'''<!DOCTYPE html>
 <html lang="en">
@@ -505,6 +668,7 @@ def generate_html(model: CraneModel, result: AnalysisResult) -> str:
     .stat-value.shear {{ color: #f38ba8; }}
     .stat-value.moment {{ color: #a6e3a1; }}
     .stat-value.stress {{ color: #89b4fa; }}
+    .stat-value.deflection {{ color: #cba6f7; }}
     table {{
         width: 100%;
         border-collapse: collapse;
@@ -545,7 +709,7 @@ def generate_html(model: CraneModel, result: AnalysisResult) -> str:
 <body>
 <div class="container">
     <h1>🏗️ Tower Crane Jib Analysis</h1>
-    <p class="subtitle">{model.name} — Cantilever model, {len(model.sections)} sections, L = {model.jib_length:.0f} m</p>
+    <p class="subtitle">{model.name} — Cantilever model, {len(model.sections)} sections, L = {model.jib_length:.0f} m, E = {model.youngs_modulus / 1e6:.0f} GPa</p>
 
     <div class="coord-info">
         Coordinate system: <span>X</span> = longitudinal (root at 0) ·
@@ -580,8 +744,9 @@ def generate_html(model: CraneModel, result: AnalysisResult) -> str:
                 <div class="stat-label">@ X = {result.max_sigma_pos:.1f} m</div>
             </div>
             <div class="stat">
-                <div class="stat-label">Critical Section</div>
-                <div class="stat-value" style="font-size:0.9rem">{sec_name}</div>
+                <div class="stat-label">Tip Deflection δ</div>
+                <div class="stat-value deflection">{tip_mm:.1f} mm</div>
+                <div class="stat-label">{defl_status} L/250 = {limit_250:.0f} mm</div>
             </div>
         </div>
     </div>
@@ -631,12 +796,19 @@ def generate_html(model: CraneModel, result: AnalysisResult) -> str:
     </div>
 
     <div class="card">
+        <h2>📈 Deflection Curve — δ(x)</h2>
+        <img src="data:image/png;base64,{deflection_b64}" alt="Deflection" />
+    </div>
+
+    <div class="card">
         <h2>📈 Stress Distribution along X</h2>
         <img src="data:image/png;base64,{stress_b64}" alt="Stress" />
     </div>
 
+    {sweep_html}
+
     <div class="footer">
-        <span class="tag">crane-jib-calc v0.2.0</span>
+        <span class="tag">crane-jib-calc v0.3.0</span>
         <span class="tag">cantilever</span>
         <span class="tag">Euler-Bernoulli</span>
         <span class="tag">1 load case</span>
@@ -663,13 +835,28 @@ def load_model(path: str) -> CraneModel:
     analysis = data.get('analysis', {})
     num_points = analysis.get('num_points', 500)
 
+    E = crane.get('youngs_modulus', DEFAULT_E)  # kN/m²
+
+    # Trolley sweep
+    ts_data = data.get('trolley_sweep')
+    trolley_sweep = None
+    if ts_data and ts_data.get('enabled'):
+        trolley_sweep = TrolleySweep(
+            magnitude=ts_data['magnitude'],
+            min_position=ts_data.get('min_position', 3.0),
+            max_position=ts_data.get('max_position', 0.0),
+            step=ts_data.get('step', 1.0),
+        )
+
     return CraneModel(
         name=crane['name'],
         jib_length=crane['jib_length'],
         sections=sections,
         point_loads=point_loads,
         udls=udls,
+        youngs_modulus=E,
         num_points=num_points,
+        trolley_sweep=trolley_sweep,
     )
 
 
@@ -677,7 +864,7 @@ def load_model(path: str) -> CraneModel:
 
 def main():
     parser = argparse.ArgumentParser(
-        description='Flat Top Tower Crane Jib Calculator — SFD, BMD & stress analysis'
+        description='Flat Top Tower Crane Jib Calculator — SFD, BMD, deflection & stress'
     )
     parser.add_argument('input', help='Path to YAML input file')
     parser.add_argument('-o', '--output', default='report.html',
@@ -690,10 +877,14 @@ def main():
     print(f"📐 Loading crane model from: {args.input}")
     model = load_model(args.input)
     print(f"   {model.name} — {model.jib_length:.0f}m jib, {len(model.sections)} sections")
+    print(f"   E = {model.youngs_modulus / 1e6:.0f} GPa")
     print(f"   Point loads: {len(model.point_loads)}/{MAX_POINT_LOADS}")
     print(f"   UDLs: {len(model.udls)}/{MAX_UDLS}")
+    if model.trolley_sweep:
+        print(f"   Trolley sweep: {model.trolley_sweep.magnitude:.0f} kN, "
+              f"[{model.trolley_sweep.min_position:.0f}–{model.trolley_sweep.max_position or model.jib_length - 2:.0f}m]")
 
-    # ── Validate ──
+    # Validate
     errors = validate_model(model)
     if errors:
         print("❌ Validation errors:")
@@ -702,18 +893,31 @@ def main():
         sys.exit(1)
     print("   ✅ Validation passed")
 
-    # ── Main analysis ──
-    print("🔧 Computing SFD & BMD along X axis...")
+    # Main analysis
+    print("🔧 Computing SFD, BMD, deflection & stress...")
     result = compute_sfd_bmd(model)
 
+    tip_mm = result.tip_delta * 1000
+    L = model.jib_length
+    limit_250 = L * 1000 / 250
     print(f"   Root reaction: V(0) = {result.reaction_V:.1f} kN, M(0) = {result.reaction_M:.1f} kN·m")
     print(f"   Max |V|:  {result.max_V:.1f} kN  @ X = {result.max_V_pos:.1f} m")
     print(f"   Max M:    {result.max_M:.1f} kN·m  @ X = {result.max_M_pos:.1f} m")
     print(f"   Max σ:    {result.max_sigma:.1f} MPa  @ X = {result.max_sigma_pos:.1f} m")
+    print(f"   Tip δ:    {tip_mm:.1f} mm  (L/250 = {limit_250:.0f} mm) {'✅' if tip_mm < limit_250 else '⚠️'}")
 
-    # ── Generate report ──
+    # Trolley sweep
+    sweep_result = None
+    if model.trolley_sweep:
+        print("🔄 Sweeping trolley positions for worst case...")
+        sweep_result = sweep_trolley(model)
+        print(f"   Worst position:  {sweep_result.worst_position:.1f} m")
+        print(f"   Worst moment:    {sweep_result.worst_moment:.1f} kN·m")
+        print(f"   Worst tip δ:     {sweep_result.worst_deflection * 1000:.1f} mm")
+
+    # Generate report
     print(f"📄 Generating HTML report: {args.output}")
-    html = generate_html(model, result)
+    html = generate_html(model, result, sweep_result)
     Path(args.output).write_text(html)
     print(f"   ✅ Report saved to {args.output}")
 
