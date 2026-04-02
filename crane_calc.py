@@ -79,6 +79,9 @@ def run_analysis(model: CraneModel) -> AnalysisResult:
     V_base = np.zeros(n)
     M_base = np.zeros(n)
 
+    # Also track result that gave max root moment for section forces
+    best_res = None
+
     for lc in load_cases:
         has_trolley = model.trolley and lc.coef('trolley') > 0
 
@@ -94,6 +97,7 @@ def run_analysis(model: CraneModel) -> AnalysisResult:
                     best_root_moment = root_m
                     best_theta = res['theta']
                     worst_trolley_pos = tp
+                    best_res = res
         else:
             res = _run_single(model, x, lc)
             _update_envelope(env, res)
@@ -101,11 +105,49 @@ def run_analysis(model: CraneModel) -> AnalysisResult:
             if root_m > best_root_moment:
                 best_root_moment = root_m
                 best_theta = res['theta']
+                best_res = res
 
-            # Store base loads (first non-trolley case)
             if np.all(V_base == 0):
                 V_base = res['V'].copy()
                 M_base = res['M'].copy()
+
+    # Compute forces at each section start (pivot point for design)
+    section_start_forces = []
+    if best_res is not None:
+        for sec in model.sections:
+            # Find index closest to section start
+            idx = int(sec.start / (model.jib_length / (n - 1)))
+            idx = min(idx, n - 1)
+
+            # For this section, upper chord is tension if M is negative (sagging), compression if positive (hogging)
+            # Wait - our convention: positive M = hogging (tension on bottom, compression on top)
+            # For cantilever root at X=0, positive M = compression on top = upper chord in compression
+            # So at section start: upper_chord = M/h (comp if +), lower_chord = -M/h (tens if +)
+            M_at_start = best_res['M'][idx]
+            h = sec.height
+
+            if sec.truss and h > 0:
+                uc = sec.truss.upper_chords
+                lc = sec.truss.lower_chords
+                upper = M_at_start / (h * uc) if uc > 0 else 0  # compression (positive)
+                lower = -M_at_start / (h * lc) if lc > 0 else 0  # tension (negative)
+
+                # Diagonals at this section
+                comp_diag = abs(best_res['F_comp_diag'][idx])
+                tens_diag = best_res['F_tens_diag'][idx]  # already negative
+                neut_diag = abs(best_res['F_neut_diag'][idx])
+            else:
+                upper = lower = comp_diag = tens_diag = neut_diag = 0.0
+
+            section_start_forces.append({
+                'section': sec.name,
+                'x': sec.start,
+                'upper_chord': upper,
+                'lower_chord': lower,
+                'comp_diag': comp_diag,
+                'tens_diag': tens_diag,
+                'neut_diag': neut_diag,
+            })
 
     max_V_idx = np.argmax(env['V'])
     max_M_idx = np.argmax(env['M'])
@@ -134,6 +176,7 @@ def run_analysis(model: CraneModel) -> AnalysisResult:
         max_F_comp_diag=np.max(env['F_comp_diag']),
         max_F_tens_diag=np.max(env['F_tens_diag']),
         worst_trolley_pos=worst_trolley_pos,
+        section_forces_at_start=section_start_forces,
         sections=model.sections,
         model=model,
     )

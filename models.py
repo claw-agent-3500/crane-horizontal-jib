@@ -94,7 +94,7 @@ class Trolley:
 class LoadCase:
     """A load case with named coefficients for each load."""
     name: str
-    coefficients: dict  # load_name → coefficient (default 1.0 if missing)
+    coefficients: dict = field(default_factory=dict)
     wind_pressure: float = 0.0  # Pa (0 = no wind for this case)
 
     def coef(self, load_name: str) -> float:
@@ -106,7 +106,7 @@ class LoadCase:
 class CraneModel:
     name: str
     jib_length: float
-    jib_height_position: float = 0.0  # Y coordinate of jib reference (m, e.g., mast top elevation)
+    jib_height_position: float = 0.0
     youngs_modulus: float = DEFAULT_E
     sections: list[Section] = field(default_factory=list)
     point_loads: list[PointLoad] = field(default_factory=list)
@@ -119,57 +119,70 @@ class CraneModel:
 # ── Analysis results ─────────────────────────────────────────────────────
 
 @dataclass
+class SectionForcesAtStart:
+    """Truss member forces at a section's start position."""
+    section: str
+    x: float
+    upper_chord: float  # + compression, - tension
+    lower_chord: float  # + compression, - tension
+    comp_diag: float
+    tens_diag: float
+    neut_diag: float
+
+
+@dataclass
 class AnalysisResult:
-    """Container for all analysis outputs. Add new fields as modules grow."""
-    # Grid
-    x: np.ndarray
+    """Container for all analysis outputs."""
+    # Fields with defaults first
+    section_forces_at_start: list = field(default_factory=list)
+    worst_trolley_pos: float = 0.0
 
-    # Base loads (self-weight, point loads, UDLs — no trolley)
-    V_base: np.ndarray
-    M_base: np.ndarray
+    # Grid arrays (no default)
+    x: np.ndarray = None
+    V_base: np.ndarray = None
+    M_base: np.ndarray = None
+    V: np.ndarray = None
+    M: np.ndarray = None
+    theta: np.ndarray = None
+    delta: np.ndarray = None
+    sigma: np.ndarray = None
+    tau: np.ndarray = None
+    F_upper_chord: np.ndarray = None
+    F_lower_chord: np.ndarray = None
+    F_comp_diag: np.ndarray = None
+    F_tens_diag: np.ndarray = None
+    F_neut_diag: np.ndarray = None
 
-    # Envelope (max across all trolley positions + base loads)
-    V: np.ndarray          # Shear force envelope (kN)
-    M: np.ndarray          # Bending moment envelope (kN·m)
+    # Summary scalars (no default)
+    reaction_V: float = 0.0
+    reaction_M: float = 0.0
+    max_V: float = 0.0
+    max_V_pos: float = 0.0
+    max_M: float = 0.0
+    max_M_pos: float = 0.0
+    max_sigma: float = 0.0
+    max_sigma_pos: float = 0.0
+    max_delta: float = 0.0
+    max_delta_pos: float = 0.0
+    tip_delta: float = 0.0
+    max_F_upper: float = 0.0
+    max_F_lower: float = 0.0
+    max_F_comp_diag: float = 0.0
+    max_F_tens_diag: float = 0.0
 
-    # Deflection envelope (from calculations.deflection)
-    theta: np.ndarray      # Slope (rad)
-    delta: np.ndarray      # Deflection envelope (m, positive = downward)
+    # Reference data (no default, come last)
+    sections: list[Section] = None
+    model: CraneModel = None
 
-    # Stresses (from calculations.stress)
-    sigma: np.ndarray      # Bending stress (MPa)
-    tau: np.ndarray         # Shear stress (MPa)
-
-    # Truss member forces (from calculations.truss) — envelope
-    F_upper_chord: np.ndarray    # kN (compression = positive)
-    F_lower_chord: np.ndarray    # kN (tension = negative)
-    F_comp_diag: np.ndarray      # kN (compression diagonal)
-    F_tens_diag: np.ndarray      # kN (tension diagonal)
-    F_neut_diag: np.ndarray      # kN (neutral diagonal)
-
-    # Summary scalars (envelope values)
-    reaction_V: float
-    reaction_M: float
-    max_V: float
-    max_V_pos: float
-    max_M: float
-    max_M_pos: float
-    max_sigma: float
-    max_sigma_pos: float
-    max_delta: float
-    max_delta_pos: float
-    tip_delta: float
-    max_F_upper: float
-    max_F_lower: float
-    max_F_comp_diag: float
-    max_F_tens_diag: float
-
-    # Reference data
-    sections: list[Section]
-    model: 'CraneModel'
-
-    # Worst-case trolley info
-    worst_trolley_pos: float = 0.0  # trolley position that creates max root moment
+    def __post_init__(self):
+        """Convert None defaults to empty arrays for numpy fields."""
+        np_fields = ['x', 'V_base', 'M_base', 'V', 'M', 'theta', 'delta', 
+                     'sigma', 'tau', 'F_upper_chord', 'F_lower_chord', 
+                     'F_comp_diag', 'F_tens_diag', 'F_neut_diag']
+        for f in np_fields:
+            val = getattr(self, f)
+            if val is None:
+                setattr(self, f, np.array([]))
 
 
 @dataclass

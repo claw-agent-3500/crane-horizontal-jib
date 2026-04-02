@@ -75,7 +75,7 @@ def generate_html(model, result, sweep_result=None) -> str:
     if has_truss:
         truss_summary = f'''
     <div class="card">
-        <h2>🔧 Truss Member Forces — Summary</h2>
+        <h2>🔧 Truss Member Forces — Summary (Envelope)</h2>
         <div class="stats">
             <div class="stat">
                 <div class="stat-label">Max Upper Chord (comp)</div>
@@ -94,6 +94,48 @@ def generate_html(model, result, sweep_result=None) -> str:
                 <div class="stat-value" style="color:#a6e3a1">{result.max_F_tens_diag:.1f} kN</div>
             </div>
         </div>
+    </div>'''
+
+    # Per-section forces at section start (pivot point for design)
+    section_forces_table = ''
+    if result.section_forces_at_start:
+        for sf in result.section_forces_at_start:
+            upper_sign = 'comp' if sf['upper_chord'] >= 0 else 'tens'
+            lower_sign = 'tens' if sf['lower_chord'] <= 0 else 'comp'
+            section_forces_table += f'''
+        <tr>
+            <td>{sf['section']}</td>
+            <td>{sf['x']:.1f}</td>
+            <td class="force-comp">{sf['upper_chord']:.1f}</td>
+            <td class="force-tens">{sf['lower_chord']:.1f}</td>
+            <td>{sf['comp_diag']:.1f}</td>
+            <td>{sf['tens_diag']:.1f}</td>
+            <td>{sf['neut_diag']:.1f}</td>
+        </tr>'''
+
+    section_forces_html = ''
+    if section_forces_table:
+        section_forces_html = f'''
+    <div class="card">
+        <h2>🔧 Forces at Section Start (Worst Case Position)</h2>
+        <p style="color:#6c7086;font-size:0.8rem;margin-bottom:1rem">
+            Forces at each section's start X (pivot point for design). Upper chord in tension when M &lt; 0 (sagging), compression when M &gt; 0 (hogging).
+        </p>
+        <table>
+            <thead>
+                <tr>
+                    <th>Section</th>
+                    <th>X (m)</th>
+                    <th>Upper Chord (kN)<br/>(+ comp, − tens)</th>
+                    <th>Lower Chord (kN)<br/>(+ comp, − tens)</th>
+                    <th>Comp Diag (kN)</th>
+                    <th>Tens Diag (kN)</th>
+                    <th>Neut Diag (kN)</th>
+                </tr>
+            </thead>
+            <tbody>{section_forces_table}
+            </tbody>
+        </table>
     </div>'''
 
     # Trolley sweep
@@ -131,6 +173,8 @@ def generate_html(model, result, sweep_result=None) -> str:
     img {{ width: 100%; border-radius: 8px; margin-top: 1rem; }}
     .stats {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 1rem; }}
     .stat {{ background: #181825; border: 1px solid #313244; border-radius: 8px; padding: 1rem; text-align: center; }}
+    .force-comp {{ color: #f38ba8; }}
+    .force-tens {{ color: #89b4fa; }}
     .stat-label {{ font-size: 0.75rem; color: #6c7086; margin-bottom: 0.3rem; }}
     .stat-value {{ font-size: 1.3rem; font-weight: 700; }}
     .stat-value.shear {{ color: #f38ba8; }}
@@ -182,6 +226,7 @@ def generate_html(model, result, sweep_result=None) -> str:
     <div class="card"><h2>📈 Stress Distribution</h2><img src="data:image/png;base64,{stress_b64}" alt="Stress" /></div>
 
     {truss_summary}
+    {section_forces_html}
     <div class="card"><h2>📈 Chord Forces</h2><img src="data:image/png;base64,{chord_b64}" alt="Chord Forces" /></div>
     <div class="card"><h2>📈 Diagonal Forces</h2><img src="data:image/png;base64,{diag_b64}" alt="Diagonal Forces" /></div>
 

@@ -16,8 +16,8 @@ sections:
     moment_of_inertia: 0.042
     height: 2.6
     wind_area: 8.5
-    cg_x: 6.0   # CG at midpoint
-    cg_y: 45.0  # relative to datum
+    cg_x: 6.0
+    cg_y: 45.0
     cg_z: 0.0
     truss:
       upper_chords: 2
@@ -100,7 +100,7 @@ point_loads:
     magnitude: 15.0
     wind_area: 1.5
     cg_x: 60.0
-    cg_y: 43.7  # sheave below jib top
+    cg_y: 43.7
     cg_z: 0.0
 
   - name: "Counterweight Connection"
@@ -121,28 +121,28 @@ trolley:
   max_position: 58.0
   step: 1.0
   wind_area: 3.0
-  cg_x: 20.0  # varies with position
+  cg_x: 20.0
   cg_y: 45.0
   cg_z: 0.0
 
-# Load cases with coefficients and wind pressure
+# Load cases
 load_cases:
   - name: "In Service (Working)"
-    wind_pressure: 250  # Pa
+    wind_pressure: 250
     coef_self_weight: 1.0
     coef_tip_sheave_hoist: 1.0
     coef_counterweight_connection: 1.0
     coef_trolley: 1.0
 
   - name: "Out of Service (Storm)"
-    wind_pressure: 1100  # Pa
+    wind_pressure: 1100
     coef_self_weight: 1.0
     coef_tip_sheave_hoist: 1.0
     coef_counterweight_connection: 1.0
     coef_trolley: 0.0
 
   - name: "Erection"
-    wind_pressure: 0  # Pa (no wind)
+    wind_pressure: 0
     coef_self_weight: 1.2
     coef_tip_sheave_hoist: 0.0
     coef_counterweight_connection: 0.0
