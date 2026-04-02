@@ -43,6 +43,7 @@ class Section:
     area: float               # m² (effective A)
     moment_of_inertia: float  # m⁴ (I about Z axis)
     height: float             # m (Y dimension, depth)
+    wind_area: float = 0.0    # m² (projected area for wind)
     truss: Optional[TrussConfig] = None
 
     @property
@@ -55,6 +56,7 @@ class PointLoad:
     name: str
     position: float  # X position (m from root)
     magnitude: float  # kN (downward, -Y)
+    wind_area: float = 0.0  # m² (projected area for wind)
 
 
 @dataclass
@@ -63,6 +65,7 @@ class UDL:
     start: float      # X start (m)
     end: float        # X end (m)
     magnitude: float  # kN/m (downward, -Y)
+    wind_area: float = 0.0  # m²/m (projected area per meter)
 
 
 @dataclass
@@ -72,6 +75,7 @@ class Trolley:
     min_position: float       # m from root (closest to root)
     max_position: float       # m from root (closest to tip)
     step: float = 1.0         # m step for envelope computation
+    wind_area: float = 0.0    # m² (projected area for wind)
 
 
 @dataclass
@@ -79,6 +83,7 @@ class LoadCase:
     """A load case with named coefficients for each load."""
     name: str
     coefficients: dict  # load_name → coefficient (default 1.0 if missing)
+    wind_pressure: float = 0.0  # Pa (0 = no wind for this case)
 
     def coef(self, load_name: str) -> float:
         """Get coefficient for a named load. Defaults to 1.0."""

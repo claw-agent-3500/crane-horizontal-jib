@@ -30,7 +30,18 @@ def _parse_truss(data: dict) -> TrussConfig:
 def _parse_section(data: dict) -> Section:
     truss_data = data.pop('truss', None)
     truss = _parse_truss(truss_data) if truss_data else None
-    return Section(**data, truss=truss)
+    wind_area = data.pop('wind_area', 0.0)
+    return Section(**data, truss=truss, wind_area=wind_area)
+
+
+def _parse_point_load(data: dict) -> PointLoad:
+    wind_area = data.pop('wind_area', 0.0)
+    return PointLoad(**data, wind_area=wind_area)
+
+
+def _parse_udl(data: dict) -> UDL:
+    wind_area = data.pop('wind_area', 0.0)
+    return UDL(**data, wind_area=wind_area)
 
 
 def load_model(path: str) -> CraneModel:
@@ -39,8 +50,8 @@ def load_model(path: str) -> CraneModel:
 
     crane = data['crane']
     sections = [_parse_section(dict(s)) for s in data['sections']]
-    point_loads = [PointLoad(**pl) for pl in data.get('point_loads', [])]
-    udls = [UDL(**u) for u in data.get('udls', [])]
+    point_loads = [_parse_point_load(dict(pl)) for pl in data.get('point_loads', [])]
+    udls = [_parse_udl(dict(u)) for u in data.get('udls', [])]
 
     analysis = data.get('analysis', {})
     num_points = analysis.get('num_points', 500)
@@ -54,6 +65,7 @@ def load_model(path: str) -> CraneModel:
             min_position=ts_data['min_position'],
             max_position=ts_data['max_position'],
             step=ts_data.get('step', 1.0),
+            wind_area=ts_data.get('wind_area', 0.0),
         )
 
     # Load cases
@@ -62,11 +74,12 @@ def load_model(path: str) -> CraneModel:
     for lc in lc_data:
         # Parse coefficients: keys starting with "coef_"
         coefs = {k[5:]: v for k, v in lc.items() if k.startswith('coef_')}
-        load_cases.append(LoadCase(name=lc['name'], coefficients=coefs))
+        wind_pressure = lc.get('wind_pressure', 0.0)  # Pa
+        load_cases.append(LoadCase(name=lc['name'], coefficients=coefs, wind_pressure=wind_pressure))
 
-    # If no load cases defined, create a default one (all coef = 1.0)
+    # If no load cases defined, create a default one (all coef = 1.0, no wind)
     if not load_cases:
-        load_cases.append(LoadCase(name='Default (All loads)', coefficients={}))
+        load_cases.append(LoadCase(name='Default (All loads)', coefficients={}, wind_pressure=0.0))
 
     return CraneModel(
         name=crane['name'],

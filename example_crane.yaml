@@ -14,6 +14,7 @@ sections:
     area: 0.085
     moment_of_inertia: 0.042
     height: 2.6
+    wind_area: 8.5  # m² (projected area for wind)
     truss:
       upper_chords: 2
       lower_chords: 2
@@ -27,6 +28,7 @@ sections:
     area: 0.068
     moment_of_inertia: 0.031
     height: 2.2
+    wind_area: 6.8
     truss:
       upper_chords: 2
       lower_chords: 2
@@ -40,6 +42,7 @@ sections:
     area: 0.048
     moment_of_inertia: 0.018
     height: 1.8
+    wind_area: 4.8
     truss:
       upper_chords: 1
       lower_chords: 2
@@ -54,6 +57,7 @@ sections:
     area: 0.032
     moment_of_inertia: 0.009
     height: 1.4
+    wind_area: 3.2
     truss:
       upper_chords: 1
       lower_chords: 2
@@ -67,6 +71,7 @@ sections:
     area: 0.025
     moment_of_inertia: 0.005
     height: 1.2
+    wind_area: 2.0
     truss:
       upper_chords: 1
       lower_chords: 1
@@ -77,47 +82,43 @@ point_loads:
   - name: "Tip Sheave + Hoist"
     position: 60.0
     magnitude: 15.0
+    wind_area: 1.5  # m²
 
   - name: "Counterweight Connection"
     position: 0.5
     magnitude: 8.0
+    wind_area: 0.0
 
 # UDLs (max 5)
 udls: []
 
-# Trolley — envelope computed across all positions in [min, max]
+# Trolley
 trolley:
   magnitude: 128.0
   min_position: 3.0
   max_position: 58.0
   step: 1.0
+  wind_area: 3.0  # m² (trolley + hook block)
 
-# Load cases — each load is multiplied by its coefficient
-# Coefficient keys use prefix "coef_" + load name (spaces→underscores, lowercase)
-# Self-weight coefficient: coef_self_weight
-# Missing coefficients default to 1.0
+# Load cases with coefficients and wind pressure
 load_cases:
-  - name: "Working — Max Payload"
+  - name: "In Service (Working)"
+    wind_pressure: 250  # Pa
     coef_self_weight: 1.0
     coef_tip_sheave_hoist: 1.0
     coef_counterweight_connection: 1.0
     coef_trolley: 1.0
 
-  - name: "Working — No Payload (Empty Hook)"
+  - name: "Out of Service (Storm)"
+    wind_pressure: 1100  # Pa
     coef_self_weight: 1.0
     coef_tip_sheave_hoist: 1.0
     coef_counterweight_connection: 1.0
-    coef_trolley: 0.0        # trolley at root, no payload moment
-
-  - name: "Non-Working — Storm (Wind)"
-    coef_self_weight: 1.0
-    coef_tip_sheave_hoist: 1.0
-    coef_counterweight_connection: 1.0
-    coef_trolley: 0.0        # no payload
-    # Add wind UDL here when defined
+    coef_trolley: 0.0
 
   - name: "Erection"
-    coef_self_weight: 1.2    # impact factor
+    wind_pressure: 0  # Pa (no wind)
+    coef_self_weight: 1.2
     coef_tip_sheave_hoist: 0.0
     coef_counterweight_connection: 0.0
     coef_trolley: 0.0
