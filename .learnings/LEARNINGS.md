@@ -154,3 +154,25 @@ Always include deflection in structural reports. Check against L/250 and L/400 l
 - See Also: FEAT-20260402-001
 
 ---
+
+## [LRN-20260402-005] best_practice
+
+**Logged**: 2026-04-02T13:03:57Z
+**Priority**: high
+**Status**: pending
+**Area**: backend
+
+### Summary
+Modular architecture for expandable calculations
+
+### Details
+Restructured monolithic crane_calc.py into modular package: models.py (data), calculations/ (beam, deflection, stress, truss), plotting/ (7 plot modules), report.py (HTML), loader.py (YAML), validation.py, crane_calc.py (CLI). New calculations just add a file in calculations/ and a corresponding plot in plotting/.
+
+### Suggested Action
+Follow the pipeline pattern: each calc module takes (model, x, ...) and returns a dict. Each plot module takes a result and returns base64 PNG. Wire them in run_analysis() and report.py.
+
+### Metadata
+- Source: conversation
+- Tags: architecture, modular, refactor
+
+---

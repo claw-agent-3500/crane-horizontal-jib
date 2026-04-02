@@ -1,20 +1,24 @@
 # Tower Crane Jib Calculator - Example Input
-# Flat top tower crane jib modeled as cantilever with varying cross-sections
 # Coordinate system: X=longitudinal, Y=height (positive up), Z=width
 
 crane:
   name: "TC7030-12 Example"
-  jib_length: 60.0             # Total jib length (m)
-  youngs_modulus: 200000000.0  # kN/m² (200 GPa steel)
+  jib_length: 60.0
+  youngs_modulus: 200000000.0  # kN/m² (200 GPa)
 
 sections:
-  - name: "Root Section (Heavy Truss)"
+  - name: "Root Section"
     start: 0.0
     end: 12.0
     weight_per_length: 2.8
     area: 0.085
     moment_of_inertia: 0.042
     height: 2.6
+    truss:
+      upper_chords: 2
+      lower_chords: 2
+      compression_diagonal: { angle: 45, present: true }
+      tension_diagonal: { angle: 45, present: true }
 
   - name: "Mid-Root Section"
     start: 12.0
@@ -23,6 +27,11 @@ sections:
     area: 0.068
     moment_of_inertia: 0.031
     height: 2.2
+    truss:
+      upper_chords: 2
+      lower_chords: 2
+      compression_diagonal: { angle: 45, present: true }
+      tension_diagonal: { angle: 45, present: true }
 
   - name: "Mid Section"
     start: 24.0
@@ -31,14 +40,25 @@ sections:
     area: 0.048
     moment_of_inertia: 0.018
     height: 1.8
+    truss:
+      upper_chords: 1
+      lower_chords: 2
+      compression_diagonal: { angle: 50, present: true }
+      tension_diagonal: { angle: 50, present: true }
+      neutral_diagonal: { angle: 90, present: true }
 
-  - name: "Tip Section (Light Truss)"
+  - name: "Tip Section"
     start: 40.0
     end: 55.0
     weight_per_length: 1.0
     area: 0.032
     moment_of_inertia: 0.009
     height: 1.4
+    truss:
+      upper_chords: 1
+      lower_chords: 2
+      compression_diagonal: { angle: 55, present: true }
+      tension_diagonal: { angle: 55, present: true }
 
   - name: "Tip Assembly"
     start: 55.0
@@ -47,6 +67,10 @@ sections:
     area: 0.025
     moment_of_inertia: 0.005
     height: 1.2
+    truss:
+      upper_chords: 1
+      lower_chords: 1
+      compression_diagonal: { angle: 60, present: true }
 
 # Point loads (max 5)
 point_loads:
@@ -58,27 +82,16 @@ point_loads:
     position: 0.5
     magnitude: 8.0
 
-# UDLs (max 5) — additional distributed loads beyond section self-weights
+# UDLs (max 5)
 udls: []
 
-# Trolley sweep — finds worst-case trolley position
+# Trolley sweep
 trolley_sweep:
   enabled: true
-  magnitude: 128.0    # kN (trolley + max payload)
+  magnitude: 128.0
   min_position: 3.0
   max_position: 58.0
   step: 1.0
 
-# Analysis settings
 analysis:
   num_points: 500
-  units:
-    force: "kN"
-    moment: "kN·m"
-    stress: "MPa"
-    length: "m"
-    deflection: "mm"
-  coordinate_system:
-    x: "longitudinal (along jib, root at 0)"
-    y: "vertical (positive up, gravity in -Y)"
-    z: "width (perpendicular to bending plane)"
