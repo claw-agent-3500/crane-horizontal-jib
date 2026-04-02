@@ -176,3 +176,26 @@ Follow the pipeline pattern: each calc module takes (model, x, ...) and returns 
 - Tags: architecture, modular, refactor
 
 ---
+
+## [LRN-20260402-006] insight
+
+**Logged**: 2026-04-02T16:19:33Z
+**Priority**: high
+**Status**: pending
+**Area**: backend
+
+### Summary
+Used self-improvement loop to improve the tool itself
+
+### Details
+Following LRN-20260402-002 (audit features before rebuild), applied self-improvement feedback to evolve crane-jib-calc: added deflection (from FEAT), trolley sweep (restored from LRN), modular architecture (LRN), load cases with coefficients (from user requirements), and wind loads with wind_area/wind_pressure. Each iteration logged, pushed to repo, creating a feedback loop where the tool improves itself.
+
+### Suggested Action
+For future projects: start self-improvement loop early, log every feature decision, apply learnings to next iteration. The loop compounds.
+
+### Metadata
+- Source: conversation
+- Tags: self_improvement, feedback_loop, iterative_development
+- See Also: LRN-20260402-002, FEAT-20260402-001, LRN-20260402-003, LRN-20260402-004
+
+---
