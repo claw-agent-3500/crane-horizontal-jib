@@ -1,0 +1,127 @@
+# Tower Crane Jib Calculator - Example Input
+# Coordinate system: X=longitudinal, Y=height (positive up), Z=width
+
+crane:
+  name: "TC7030-12 Example"
+  jib_length: 60.0
+  youngs_modulus: 200000000.0  # kN/m² (200 GPa)
+
+sections:
+  - name: "Root Section"
+    start: 0.0
+    end: 12.0
+    weight_per_length: 2.8
+    area: 0.085
+    moment_of_inertia: 0.042
+    height: 2.6
+    wind_area: 8.5  # m² (projected area for wind)
+    truss:
+      upper_chords: 2
+      lower_chords: 2
+      compression_diagonal: { angle: 45, present: true }
+      tension_diagonal: { angle: 45, present: true }
+
+  - name: "Mid-Root Section"
+    start: 12.0
+    end: 24.0
+    weight_per_length: 2.2
+    area: 0.068
+    moment_of_inertia: 0.031
+    height: 2.2
+    wind_area: 6.8
+    truss:
+      upper_chords: 2
+      lower_chords: 2
+      compression_diagonal: { angle: 45, present: true }
+      tension_diagonal: { angle: 45, present: true }
+
+  - name: "Mid Section"
+    start: 24.0
+    end: 40.0
+    weight_per_length: 1.6
+    area: 0.048
+    moment_of_inertia: 0.018
+    height: 1.8
+    wind_area: 4.8
+    truss:
+      upper_chords: 1
+      lower_chords: 2
+      compression_diagonal: { angle: 50, present: true }
+      tension_diagonal: { angle: 50, present: true }
+      neutral_diagonal: { angle: 90, present: true }
+
+  - name: "Tip Section"
+    start: 40.0
+    end: 55.0
+    weight_per_length: 1.0
+    area: 0.032
+    moment_of_inertia: 0.009
+    height: 1.4
+    wind_area: 3.2
+    truss:
+      upper_chords: 1
+      lower_chords: 2
+      compression_diagonal: { angle: 55, present: true }
+      tension_diagonal: { angle: 55, present: true }
+
+  - name: "Tip Assembly"
+    start: 55.0
+    end: 60.0
+    weight_per_length: 0.8
+    area: 0.025
+    moment_of_inertia: 0.005
+    height: 1.2
+    wind_area: 2.0
+    truss:
+      upper_chords: 1
+      lower_chords: 1
+      compression_diagonal: { angle: 60, present: true }
+
+# Point loads (max 5)
+point_loads:
+  - name: "Tip Sheave + Hoist"
+    position: 60.0
+    magnitude: 15.0
+    wind_area: 1.5  # m²
+
+  - name: "Counterweight Connection"
+    position: 0.5
+    magnitude: 8.0
+    wind_area: 0.0
+
+# UDLs (max 5)
+udls: []
+
+# Trolley
+trolley:
+  magnitude: 128.0
+  min_position: 3.0
+  max_position: 58.0
+  step: 1.0
+  wind_area: 3.0  # m² (trolley + hook block)
+
+# Load cases with coefficients and wind pressure
+load_cases:
+  - name: "In Service (Working)"
+    wind_pressure: 250  # Pa
+    coef_self_weight: 1.0
+    coef_tip_sheave_hoist: 1.0
+    coef_counterweight_connection: 1.0
+    coef_trolley: 1.0
+
+  - name: "Out of Service (Storm)"
+    wind_pressure: 1100  # Pa
+    coef_self_weight: 1.0
+    coef_tip_sheave_hoist: 1.0
+    coef_counterweight_connection: 1.0
+    coef_trolley: 0.0
+
+  - name: "Erection"
+    wind_pressure: 0  # Pa (no wind)
+    coef_self_weight: 1.2
+    coef_tip_sheave_hoist: 0.0
+    coef_counterweight_connection: 0.0
+    coef_trolley: 0.0
+
+analysis:
+  num_points: 500
