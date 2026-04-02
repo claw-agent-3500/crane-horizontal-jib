@@ -3,7 +3,7 @@
 import yaml
 
 from models import (
-    CraneModel, Section, PointLoad, UDL, TrolleySweep,
+    CraneModel, Section, PointLoad, UDL, Trolley, LoadCase,
     TrussConfig, DiagonalConfig, DEFAULT_E,
 )
 
@@ -46,15 +46,27 @@ def load_model(path: str) -> CraneModel:
     num_points = analysis.get('num_points', 500)
     E = crane.get('youngs_modulus', DEFAULT_E)
 
-    ts_data = data.get('trolley_sweep')
-    trolley_sweep = None
-    if ts_data and ts_data.get('enabled'):
-        trolley_sweep = TrolleySweep(
+    ts_data = data.get('trolley')
+    trolley = None
+    if ts_data:
+        trolley = Trolley(
             magnitude=ts_data['magnitude'],
-            min_position=ts_data.get('min_position', 3.0),
-            max_position=ts_data.get('max_position', 0.0),
+            min_position=ts_data['min_position'],
+            max_position=ts_data['max_position'],
             step=ts_data.get('step', 1.0),
         )
+
+    # Load cases
+    lc_data = data.get('load_cases', [])
+    load_cases = []
+    for lc in lc_data:
+        # Parse coefficients: keys starting with "coef_"
+        coefs = {k[5:]: v for k, v in lc.items() if k.startswith('coef_')}
+        load_cases.append(LoadCase(name=lc['name'], coefficients=coefs))
+
+    # If no load cases defined, create a default one (all coef = 1.0)
+    if not load_cases:
+        load_cases.append(LoadCase(name='Default (All loads)', coefficients={}))
 
     return CraneModel(
         name=crane['name'],
@@ -64,5 +76,6 @@ def load_model(path: str) -> CraneModel:
         udls=udls,
         youngs_modulus=E,
         num_points=num_points,
-        trolley_sweep=trolley_sweep,
+        trolley=trolley,
+        load_cases=load_cases,
     )

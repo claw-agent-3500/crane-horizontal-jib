@@ -85,13 +85,42 @@ point_loads:
 # UDLs (max 5)
 udls: []
 
-# Trolley sweep
-trolley_sweep:
-  enabled: true
+# Trolley — envelope computed across all positions in [min, max]
+trolley:
   magnitude: 128.0
   min_position: 3.0
   max_position: 58.0
   step: 1.0
+
+# Load cases — each load is multiplied by its coefficient
+# Coefficient keys use prefix "coef_" + load name (spaces→underscores, lowercase)
+# Self-weight coefficient: coef_self_weight
+# Missing coefficients default to 1.0
+load_cases:
+  - name: "Working — Max Payload"
+    coef_self_weight: 1.0
+    coef_tip_sheave_hoist: 1.0
+    coef_counterweight_connection: 1.0
+    coef_trolley: 1.0
+
+  - name: "Working — No Payload (Empty Hook)"
+    coef_self_weight: 1.0
+    coef_tip_sheave_hoist: 1.0
+    coef_counterweight_connection: 1.0
+    coef_trolley: 0.0        # trolley at root, no payload moment
+
+  - name: "Non-Working — Storm (Wind)"
+    coef_self_weight: 1.0
+    coef_tip_sheave_hoist: 1.0
+    coef_counterweight_connection: 1.0
+    coef_trolley: 0.0        # no payload
+    # Add wind UDL here when defined
+
+  - name: "Erection"
+    coef_self_weight: 1.2    # impact factor
+    coef_tip_sheave_hoist: 0.0
+    coef_counterweight_connection: 0.0
+    coef_trolley: 0.0
 
 analysis:
   num_points: 500

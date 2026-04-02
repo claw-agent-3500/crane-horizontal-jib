@@ -1,6 +1,6 @@
 """Data models for crane jib analysis."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional
 
 import numpy as np
@@ -66,11 +66,23 @@ class UDL:
 
 
 @dataclass
-class TrolleySweep:
+class Trolley:
+    """Trolley + payload moving along the jib."""
     magnitude: float          # kN (trolley + payload)
-    min_position: float = 3.0
-    max_position: float = 0.0  # 0 = auto (jib_length - 2m)
-    step: float = 1.0
+    min_position: float       # m from root (closest to root)
+    max_position: float       # m from root (closest to tip)
+    step: float = 1.0         # m step for envelope computation
+
+
+@dataclass
+class LoadCase:
+    """A load case with named coefficients for each load."""
+    name: str
+    coefficients: dict  # load_name → coefficient (default 1.0 if missing)
+
+    def coef(self, load_name: str) -> float:
+        """Get coefficient for a named load. Defaults to 1.0."""
+        return self.coefficients.get(load_name, 1.0)
 
 
 @dataclass
@@ -82,7 +94,8 @@ class CraneModel:
     udls: list[UDL]
     youngs_modulus: float = DEFAULT_E
     num_points: int = 500
-    trolley_sweep: Optional[TrolleySweep] = None
+    trolley: Optional[Trolley] = None  # None = no trolley
+    load_cases: list[LoadCase] = field(default_factory=list)  # empty = single default case
 
 
 # ── Analysis results ─────────────────────────────────────────────────────
@@ -93,26 +106,30 @@ class AnalysisResult:
     # Grid
     x: np.ndarray
 
-    # Beam results (from calculations.beam)
-    V: np.ndarray          # Shear force (kN)
-    M: np.ndarray          # Bending moment (kN·m)
+    # Base loads (self-weight, point loads, UDLs — no trolley)
+    V_base: np.ndarray
+    M_base: np.ndarray
 
-    # Deflection (from calculations.deflection)
+    # Envelope (max across all trolley positions + base loads)
+    V: np.ndarray          # Shear force envelope (kN)
+    M: np.ndarray          # Bending moment envelope (kN·m)
+
+    # Deflection envelope (from calculations.deflection)
     theta: np.ndarray      # Slope (rad)
-    delta: np.ndarray      # Deflection (m, positive = downward)
+    delta: np.ndarray      # Deflection envelope (m, positive = downward)
 
     # Stresses (from calculations.stress)
     sigma: np.ndarray      # Bending stress (MPa)
     tau: np.ndarray         # Shear stress (MPa)
 
-    # Truss member forces (from calculations.truss)
+    # Truss member forces (from calculations.truss) — envelope
     F_upper_chord: np.ndarray    # kN (compression = positive)
     F_lower_chord: np.ndarray    # kN (tension = negative)
     F_comp_diag: np.ndarray      # kN (compression diagonal)
     F_tens_diag: np.ndarray      # kN (tension diagonal)
     F_neut_diag: np.ndarray      # kN (neutral diagonal)
 
-    # Summary scalars
+    # Summary scalars (envelope values)
     reaction_V: float
     reaction_M: float
     max_V: float
@@ -132,6 +149,9 @@ class AnalysisResult:
     # Reference data
     sections: list[Section]
     model: 'CraneModel'
+
+    # Worst-case trolley info
+    worst_trolley_pos: float = 0.0  # trolley position that creates max root moment
 
 
 @dataclass

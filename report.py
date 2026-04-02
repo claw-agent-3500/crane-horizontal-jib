@@ -7,7 +7,6 @@ from plotting.deflection_plot import plot_deflection
 from plotting.stress_plot import plot_stress
 from plotting.chord_plot import plot_chord_forces
 from plotting.diagonal_plot import plot_diagonal_forces
-from plotting.sweep import plot_sweep
 
 from calculations.beam import get_section_at
 
@@ -28,6 +27,12 @@ def generate_html(model, result, sweep_result=None) -> str:
     limit_250 = L * 1000 / 250
     tip_mm = result.tip_delta * 1000
     defl_status = '✅' if tip_mm < limit_250 else '⚠️'
+
+    trolley_info = ''
+    if model.trolley:
+        t = model.trolley
+        trolley_info = f' · Trolley: {t.magnitude:.0f} kN [{t.min_position:.0f}–{t.max_position:.0f} m]'
+    envelope_label = ' (envelope)' if model.trolley else ''
 
     # Section table
     section_rows = ''
@@ -143,8 +148,8 @@ def generate_html(model, result, sweep_result=None) -> str:
 <body>
 <div class="container">
     <h1>🏗️ Tower Crane Jib Analysis</h1>
-    <p class="subtitle">{model.name} — {len(model.sections)} sections, L = {model.jib_length:.0f} m, E = {model.youngs_modulus / 1e6:.0f} GPa</p>
-    <div class="coord-info">Coordinate system: <span>X</span> = longitudinal · <span>Y</span> = vertical (up) · <span>Z</span> = width</div>
+    <p class="subtitle">{model.name} — {len(model.sections)} sections, L = {model.jib_length:.0f} m, E = {model.youngs_modulus / 1e6:.0f} GPa{trolley_info}</p>
+    <div class="coord-info">Coordinate system: <span>X</span> = longitudinal · <span>Y</span> = vertical (up) · <span>Z</span> = width{envelope_label}</div>
 
     <div class="card">
         <h2>📊 Summary</h2>
