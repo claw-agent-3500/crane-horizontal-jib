@@ -15,6 +15,8 @@ from calculations.beam import get_section_at
 
 
 def generate_html(model, result, sweep_result=None) -> str:
+    # Report config (for future selective display)
+    cfg = getattr(model, 'report_config', None)
     schematic_b64 = plot_schematic(model)
     sfd_b64 = plot_sfd(result)
     bmd_b64 = plot_bmd(result)

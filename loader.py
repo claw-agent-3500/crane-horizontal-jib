@@ -2,7 +2,8 @@
 
 import yaml
 
-from models import ReportConfig, (
+from models import (
+    ReportConfig,
     CraneModel, Section, PointLoad, UDL, Trolley, LoadCase,
     TrussConfig, DiagonalConfig, DEFAULT_E,
 )
@@ -95,7 +96,7 @@ def load_model(path: str) -> CraneModel:
     if not load_cases:
         load_cases.append(LoadCase(name='Default (All loads)', coefficients={}, wind_pressure=0.0))
 
-    return CraneModel(
+    model = CraneModel(
         name=crane['name'],
         jib_length=crane['jib_length'],
         jib_height_position=crane.get('jib_height_position', 0.0),
@@ -107,8 +108,10 @@ def load_model(path: str) -> CraneModel:
         serviceability_limit=serviceability,
         trolley=trolley,
         load_cases=load_cases,
-        report_config=ReportConfig() if 'report' not in data else _parse_report_config(data['report']),
     )
+    # Set report config
+    model.report_config = ReportConfig() if 'report' not in data else _parse_report_config(data['report'])
+    return model
 
 
 def _parse_report_config(data: dict) -> ReportConfig:
