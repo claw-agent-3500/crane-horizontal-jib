@@ -1,0 +1,19 @@
+load_cases:
+- coef_counterweight_connection: 1.0
+  coef_self_weight: 1.0
+  coef_tip_sheave_hoist: 1.0
+  coef_trolley: 1.0
+  name: In Service (Working)
+  wind_pressure: 250
+- coef_counterweight_connection: 1.0
+  coef_self_weight: 1.0
+  coef_tip_sheave_hoist: 1.0
+  coef_trolley: 0.0
+  name: Out of Service (Storm)
+  wind_pressure: 1100
+- coef_counterweight_connection: 0.0
+  coef_self_weight: 1.2
+  coef_tip_sheave_hoist: 0.0
+  coef_trolley: 0.0
+  name: Erection
+  wind_pressure: 0

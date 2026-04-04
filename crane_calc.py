@@ -19,6 +19,7 @@ from validation import validate_model
 from loader import load_model
 from calculations import compute_beam, compute_deflection, compute_stress, compute_truss_forces
 from load_case_summary import compute_load_case_summary
+from load_case_io import save_load_case_set, load_load_case_set
 from report import generate_html
 
 
@@ -222,6 +223,10 @@ def main():
                         help='Output HTML report path (default: report.html)')
     parser.add_argument('--csv', action='store_true',
                         help='Also export results to CSV files')
+    parser.add_argument('--save-lc', metavar='FILE',
+                        help='Save load cases to a YAML file')
+    parser.add_argument('--load-lc', metavar='FILE',
+                        help='Load additional load cases from YAML file')
     parser.add_argument('--no-browser', action='store_true',
                         help='Skip opening the report in browser')
 
@@ -229,6 +234,20 @@ def main():
 
     print(f"📐 Loading crane model from: {args.input}")
     model = load_model(args.input)
+
+    # Handle load case save/load
+    if args.save_lc:
+        save_load_case_set(model.load_cases, args.save_lc)
+        print(f"✅ Saved {len(model.load_cases)} load cases to {args.save_lc}")
+        return
+    
+    if args.load_lc:
+        extra_lc = load_load_case_set(args.load_lc)
+        model.load_cases.extend(extra_lc)
+        print(f"✅ Loaded {len(extra_lc)} load cases from {args.load_lc}")
+        print(f"   Total load cases: {len(model.load_cases)}")
+
+    print(f"📐 Loading crane model from: {args.input}")
     print(f"   {model.name} — {model.jib_length:.0f}m jib, {len(model.sections)} sections")
     print(f"   E = {model.youngs_modulus / 1e6:.0f} GPa")
     print(f"   Point loads: {len(model.point_loads)}/{MAX_POINT_LOADS}")
