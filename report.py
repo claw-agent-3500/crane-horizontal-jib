@@ -1,4 +1,5 @@
 """HTML report generator."""
+from plotting.utilization_plot import plot_utilization
 from plotting.wind_plot import plot_wind_diagram
 
 from plotting.schematic import plot_schematic
@@ -17,6 +18,7 @@ def generate_html(model, result, sweep_result=None) -> str:
     sfd_b64 = plot_sfd(result)
     bmd_b64 = plot_bmd(result)
     deflection_b64 = plot_deflection(result)
+    utilization_b64 = plot_utilization(result)
     # Wind diagram - use max wind_pressure from load cases
     max_wind_pressure = max([lc.wind_pressure for lc in model.load_cases], default=0)
     wind_b64 = plot_wind_diagram(model, max_wind_pressure, result.x)
@@ -308,6 +310,8 @@ def generate_html(model, result, sweep_result=None) -> str:
     <div class="card"><h2>📈 Bending Moment Diagram — M(x)</h2><img src="data:image/png;base64,{bmd_b64}" alt="BMD" /></div>
     <div class="card"><h2>📈 Deflection Curve — δ(x)</h2><img src="data:image/png;base64,{deflection_b64}" alt="Deflection" /></div>
     <div class="card"><h2>📈 Wind Loads Diagram</h2><img src="data:image/png;base64,{wind_b64}" alt="Wind" /></div>
+
+    <div class="card"><h2>📈 Utilization Ratio Plot</h2><img src="data:image/png;base64,{utilization_b64}" alt="Utilization" /></div>
 
     <div class="card"><h2>📈 Stress Distribution</h2><img src="data:image/png;base64,{stress_b64}" alt="Stress" /></div>
 
