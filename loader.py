@@ -34,7 +34,8 @@ def _parse_section(data: dict) -> Section:
     cg_x = data.pop('cg_x', 0.0)
     cg_y = data.pop('cg_y', 0.0)
     cg_z = data.pop('cg_z', 0.0)
-    return Section(**data, truss=truss, wind_area=wind_area, cg_x=cg_x, cg_y=cg_y, cg_z=cg_z)
+    yield_strength = data.pop('yield_strength', 345.0)
+    return Section(**data, truss=truss, wind_area=wind_area, cg_x=cg_x, cg_y=cg_y, cg_z=cg_z, yield_strength=yield_strength)
 
 
 def _parse_point_load(data: dict) -> PointLoad:
@@ -64,6 +65,7 @@ def load_model(path: str) -> CraneModel:
 
     analysis = data.get('analysis', {})
     num_points = analysis.get('num_points', 500)
+    serviceability = analysis.get('serviceability_limit', 'L/250')  # L/250, L/400, or custom
     E = crane.get('youngs_modulus', DEFAULT_E)
 
     ts_data = data.get('trolley')
@@ -102,6 +104,7 @@ def load_model(path: str) -> CraneModel:
         udls=udls,
         youngs_modulus=E,
         num_points=num_points,
+        serviceability_limit=serviceability,
         trolley=trolley,
         load_cases=load_cases,
     )

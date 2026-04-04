@@ -42,11 +42,12 @@ class Section:
     weight_per_length: float  # kN/m (self-weight, acts in -Y)
     area: float               # m² (effective A)
     moment_of_inertia: float  # m⁴ (I about Z axis)
-    height: float             # m (Y dimension, depth)
+    height: float             # m ( Y dimension, depth)
     wind_area: float = 0.0   # m² (projected area for wind)
     cg_x: float = 0.0         # X coordinate of CG (m from root)
     cg_y: float = 0.0         # Y coordinate of CG (m, positive up)
     cg_z: float = 0.0         # Z coordinate of CG (m)
+    yield_strength: float = 345.0  # MPa (default Q345 steel)
     truss: Optional[TrussConfig] = None
 
     @property
@@ -108,6 +109,7 @@ class CraneModel:
     jib_length: float
     jib_height_position: float = 0.0
     youngs_modulus: float = DEFAULT_E
+    serviceability_limit: str = 'L/250'  # L/250, L/400, or custom ratio
     sections: list[Section] = field(default_factory=list)
     point_loads: list[PointLoad] = field(default_factory=list)
     udls: list[UDL] = field(default_factory=list)
@@ -169,6 +171,15 @@ class AnalysisResult:
     max_F_lower: float = 0.0
     max_F_comp_diag: float = 0.0
     max_F_tens_diag: float = 0.0
+
+    # Utilization
+    max_utilization: float = 0.0
+    max_utilization_pos: float = 0.0
+    section_utilization: list = field(default_factory=list)
+
+    # Per-section forces at start (with default)
+    section_forces_at_start: list = field(default_factory=list)
+    worst_trolley_pos: float = 0.0
 
     # Reference data (no default, come last)
     sections: list[Section] = None

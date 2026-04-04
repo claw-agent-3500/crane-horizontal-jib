@@ -19,6 +19,9 @@
     .stat { background: #181825; border: 1px solid #313244; border-radius: 8px; padding: 1rem; text-align: center; }
     .force-comp { color: #f38ba8; }
     .force-tens { color: #89b4fa; }
+    .util-ok { color: #a6e3a1; }
+    .util-warn { color: #f9e2af; }
+    .util-fail { color: #f38ba8; }
     .stat-label { font-size: 0.75rem; color: #6c7086; margin-bottom: 0.3rem; }
     .stat-value { font-size: 1.3rem; font-weight: 700; }
     .stat-value.shear { color: #f38ba8; }
@@ -139,6 +142,11 @@
                 <div class="stat-label">Max Tension Diagonal</div>
                 <div class="stat-value" style="color:#a6e3a1">372.0 kN</div>
             </div>
+            <div class="stat">
+                <div class="stat-label">Max Utilization</div>
+                <div class="stat-value" style="color:##f38ba8">98.5%</div>
+                <div class="stat-label">@ X = 0.0 m</div>
+            </div>
         </div>
     </div>
     
@@ -204,6 +212,58 @@
             <td>182.5</td>
             <td>-182.5</td>
             <td>0.0</td>
+        </tr>
+            </tbody>
+        </table>
+    </div>
+    
+    <div class="card">
+        <h2>🔧 Section Utilization — σ / f_y</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Section</th>
+                    <th>X (m)</th>
+                    <th>σ (MPa)</th>
+                    <th>f_y (MPa)</th>
+                    <th>Utilization</th>
+                </tr>
+            </thead>
+            <tbody>
+        <tr>
+            <td>Root Section</td>
+            <td>0.0</td>
+            <td>339.9</td>
+            <td>345</td>
+            <td class="util-fail">98.5% ❌</td>
+        </tr>
+        <tr>
+            <td>Mid-Root Section</td>
+            <td>12.0</td>
+            <td>252.3</td>
+            <td>345</td>
+            <td class="util-warn">73.1% ⚠️</td>
+        </tr>
+        <tr>
+            <td>Mid Section</td>
+            <td>24.0</td>
+            <td>201.6</td>
+            <td>345</td>
+            <td class="util-ok">58.4% ✅</td>
+        </tr>
+        <tr>
+            <td>Tip Section</td>
+            <td>40.0</td>
+            <td>141.8</td>
+            <td>345</td>
+            <td class="util-ok">41.1% ✅</td>
+        </tr>
+        <tr>
+            <td>Tip Assembly</td>
+            <td>55.0</td>
+            <td>37.5</td>
+            <td>345</td>
+            <td class="util-ok">10.9% ✅</td>
         </tr>
             </tbody>
         </table>

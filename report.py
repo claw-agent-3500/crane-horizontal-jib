@@ -24,9 +24,9 @@ def generate_html(model, result, sweep_result=None) -> str:
     sec_name = sec_at_max.name if sec_at_max else 'N/A'
 
     L = model.jib_length
-    limit_250 = L * 1000 / 250
+    limit = _parse_serviceability_limit(model.serviceability_limit, L)
     tip_mm = result.tip_delta * 1000
-    defl_status = '✅' if tip_mm < limit_250 else '⚠️'
+    defl_status = '✅' if tip_mm < limit else '⚠️'
 
     trolley_info = ''
     if model.trolley:
@@ -93,7 +93,46 @@ def generate_html(model, result, sweep_result=None) -> str:
                 <div class="stat-label">Max Tension Diagonal</div>
                 <div class="stat-value" style="color:#a6e3a1">{result.max_F_tens_diag:.1f} kN</div>
             </div>
+            <div class="stat">
+                <div class="stat-label">Max Utilization</div>
+                <div class="stat-value" style="color:#{'#f38ba8' if result.max_utilization > 0.9 else '#f9e2af' if result.max_utilization > 0.7 else '#a6e3a1'}">{result.max_utilization:.1%}</div>
+                <div class="stat-label">@ X = {result.max_utilization_pos:.1f} m</div>
+            </div>
         </div>
+    </div>'''
+
+    # Utilization table
+    util_table = ''
+    if result.section_utilization:
+        for u in result.section_utilization:
+            status = '✅' if u['utilization'] < 0.7 else ('⚠️' if u['utilization'] < 0.9 else '❌')
+            util_table += f'''
+        <tr>
+            <td>{u['section']}</td>
+            <td>{u['x']:.1f}</td>
+            <td>{u['sigma']:.1f}</td>
+            <td>{u['yield_strength']:.0f}</td>
+            <td class="{'util-ok' if u['utilization'] < 0.7 else 'util-warn' if u['utilization'] < 0.9 else 'util-fail'}">{u['utilization']:.1%} {status}</td>
+        </tr>'''
+
+    util_html = ''
+    if util_table:
+        util_html = f'''
+    <div class="card">
+        <h2>🔧 Section Utilization — σ / f_y</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Section</th>
+                    <th>X (m)</th>
+                    <th>σ (MPa)</th>
+                    <th>f_y (MPa)</th>
+                    <th>Utilization</th>
+                </tr>
+            </thead>
+            <tbody>{util_table}
+            </tbody>
+        </table>
     </div>'''
 
     # Per-section forces at section start (pivot point for design)
@@ -175,6 +214,9 @@ def generate_html(model, result, sweep_result=None) -> str:
     .stat {{ background: #181825; border: 1px solid #313244; border-radius: 8px; padding: 1rem; text-align: center; }}
     .force-comp {{ color: #f38ba8; }}
     .force-tens {{ color: #89b4fa; }}
+    .util-ok {{ color: #a6e3a1; }}
+    .util-warn {{ color: #f9e2af; }}
+    .util-fail {{ color: #f38ba8; }}
     .stat-label {{ font-size: 0.75rem; color: #6c7086; margin-bottom: 0.3rem; }}
     .stat-value {{ font-size: 1.3rem; font-weight: 700; }}
     .stat-value.shear {{ color: #f38ba8; }}
@@ -203,7 +245,7 @@ def generate_html(model, result, sweep_result=None) -> str:
             <div class="stat"><div class="stat-label">Max |V|</div><div class="stat-value shear">{result.max_V:.1f} kN</div><div class="stat-label">@ X={result.max_V_pos:.1f} m</div></div>
             <div class="stat"><div class="stat-label">Max M</div><div class="stat-value moment">{result.max_M:.1f} kN·m</div><div class="stat-label">@ X={result.max_M_pos:.1f} m</div></div>
             <div class="stat"><div class="stat-label">Max σ</div><div class="stat-value stress">{result.max_sigma:.1f} MPa</div><div class="stat-label">@ X={result.max_sigma_pos:.1f} m</div></div>
-            <div class="stat"><div class="stat-label">Tip Deflection δ</div><div class="stat-value deflection">{tip_mm:.1f} mm</div><div class="stat-label">{defl_status} L/250={limit_250:.0f} mm</div></div>
+            <div class="stat"><div class="stat-label">Tip Deflection δ</div><div class="stat-value deflection">{tip_mm:.1f} mm</div><div class="stat-label">{defl_status} {model.serviceability_limit}={limit:.0f} mm</div></div>
         </div>
     </div>
 
@@ -227,6 +269,7 @@ def generate_html(model, result, sweep_result=None) -> str:
 
     {truss_summary}
     {section_forces_html}
+    {util_html}
     <div class="card"><h2>📈 Chord Forces</h2><img src="data:image/png;base64,{chord_b64}" alt="Chord Forces" /></div>
     <div class="card"><h2>📈 Diagonal Forces</h2><img src="data:image/png;base64,{diag_b64}" alt="Diagonal Forces" /></div>
 
@@ -241,3 +284,15 @@ def generate_html(model, result, sweep_result=None) -> str:
 </div>
 </body>
 </html>'''
+
+
+def _parse_serviceability_limit(limit_str: str, jib_length: float) -> float:
+    """Parse serviceability limit string to mm."""
+    limit_str = str(limit_str).strip().upper()
+    if limit_str.startswith('L/'):
+        ratio = int(limit_str.split('/')[1])
+        return jib_length * 1000 / ratio
+    elif limit_str.isdigit():
+        return jib_length * 1000 / int(limit_str)
+    else:
+        return jib_length * 1000 / 250

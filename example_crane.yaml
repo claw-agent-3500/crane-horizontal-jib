@@ -150,3 +150,7 @@ load_cases:
 
 analysis:
   num_points: 500
+
+analysis:
+  num_points: 500
+  serviceability_limit: "L/250"  # L/250, L/400, or custom ratio like "300"

@@ -154,6 +154,29 @@ def run_analysis(model: CraneModel) -> AnalysisResult:
     max_sigma_idx = np.argmax(env['sigma'])
     max_delta_idx = np.argmax(env['delta'])
 
+    # Compute utilization ratios (sigma / yield_strength) for each section
+    section_util = []
+    if best_res is not None:
+        for sec in model.sections:
+            idx = int(sec.start / (model.jib_length / (n - 1)))
+            idx = min(idx, n - 1)
+            sigma_at_start = env['sigma'][idx]
+            util = sigma_at_start / sec.yield_strength if sec.yield_strength > 0 else 0
+            section_util.append({
+                'section': sec.name,
+                'x': sec.start,
+                'sigma': sigma_at_start,
+                'yield_strength': sec.yield_strength,
+                'utilization': util,
+            })
+
+    max_util = max([u['utilization'] for u in section_util], default=0)
+    max_util_pos = 0
+    for u in section_util:
+        if u['utilization'] == max_util:
+            max_util_pos = u['x']
+            break
+
     return AnalysisResult(
         x=x,
         V_base=V_base, M_base=M_base,
@@ -177,6 +200,9 @@ def run_analysis(model: CraneModel) -> AnalysisResult:
         max_F_tens_diag=np.max(env['F_tens_diag']),
         worst_trolley_pos=worst_trolley_pos,
         section_forces_at_start=section_start_forces,
+        max_utilization=max_util,
+        max_utilization_pos=max_util_pos,
+        section_utilization=section_util,
         sections=model.sections,
         model=model,
     )
@@ -217,39 +243,25 @@ def main():
         print("❌ Validation errors:")
         for e in errors:
             print(f"   • {e}")
-        sys.exit(1)
-    print("   ✅ Validation passed")
-
-    # Run analysis
-    print("🔧 Computing envelope (all load cases × trolley positions)...")
-    result = run_analysis(model)
-
-    tip_mm = result.tip_delta * 1000
-    limit_250 = model.jib_length * 1000 / 250
-
-    print(f"   Root: V(0) = {result.reaction_V:.1f} kN, M(0) = {result.reaction_M:.1f} kN·m")
-    print(f"   Max |V|:  {result.max_V:.1f} kN  @ X={result.max_V_pos:.1f} m")
-    print(f"   Max M:    {result.max_M:.1f} kN·m  @ X={result.max_M_pos:.1f} m")
-    print(f"   Max σ:    {result.max_sigma:.1f} MPa  @ X={result.max_sigma_pos:.1f} m")
-    print(f"   Tip δ:    {tip_mm:.1f} mm  (L/250={limit_250:.0f} mm) {'✅' if tip_mm < limit_250 else '⚠️'}")
-    if model.trolley:
-        print(f"   Worst trolley pos: {result.worst_trolley_pos:.1f} m")
-    if has_truss:
-        print(f"   Chord:    upper {result.max_F_upper:.1f} kN (comp), lower {result.max_F_lower:.1f} kN (tens)")
-        print(f"   Diagonal: comp {result.max_F_comp_diag:.1f} kN, tens {result.max_F_tens_diag:.1f} kN")
-
-    # Report
-    print(f"📄 Generating report: {args.output}")
-    html = generate_html(model, result)
-    Path(args.output).write_text(html)
-    print(f"   ✅ Saved")
-
-    if not args.no_browser:
-        import webbrowser
-        webbrowser.open(f'file://{Path(args.output).absolute()}')
-
-    print("Done! 🏗️")
 
 
-if __name__ == '__main__':
-    main()
+def _parse_serviceability_limit(limit_str: str, jib_length: float) -> float:
+    """Parse serviceability limit string to mm.
+    
+    Args:
+        limit_str: 'L/250', 'L/400', or 'custom' or a ratio like '250'
+    Returns:
+        Allowable tip deflection in mm
+    """
+    limit_str = str(limit_str).strip().upper()
+    
+    if limit_str.startswith('L/'):
+        # Parse 'L/250' or 'L/400'
+        ratio = int(limit_str.split('/')[1])
+        return jib_length * 1000 / ratio
+    elif limit_str.isdigit():
+        # Direct ratio value
+        return jib_length * 1000 / int(limit_str)
+    else:
+        # Default to L/250
+        return jib_length * 1000 / 250
