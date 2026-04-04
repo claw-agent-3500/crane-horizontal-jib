@@ -199,3 +199,25 @@ For future projects: start self-improvement loop early, log every feature decisi
 - See Also: LRN-20260402-002, FEAT-20260402-001, LRN-20260402-003, LRN-20260402-004
 
 ---
+
+## [LRN-20260404-001] insight
+
+**Logged**: 2026-04-04T13:31:00Z
+**Priority**: medium
+**Status**: pending
+**Area**: docs
+
+### Summary
+Report HTML is comprehensive but lacks PDF export
+
+### Details
+Design engineers often need PDF for formal submissions. Current HTML-only output requires printing to PDF via browser.
+
+### Suggested Action
+Add PDF export using reportlab or matplotlib backend. Keep HTML as primary, add --pdf flag.
+
+### Metadata
+- Source: conversation
+- Tags: pdf, export, reporting
+
+---
