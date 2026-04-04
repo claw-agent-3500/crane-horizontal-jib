@@ -288,3 +288,327 @@ medium
 - Frequency: first_time
 
 ---
+
+## [FEAT-20260404-008] wind-diagram
+
+**Logged**: 2026-04-04T14:30:20Z
+**Priority**: low
+**Status**: pending
+**Area**: backend
+
+### Requested Capability
+wind diagram
+
+### Summary
+Separate wind contribution diagram
+
+### User Context
+[TODO: add user context]
+
+### Complexity Estimate
+medium
+
+### Suggested Implementation
+[TODO: add suggested implementation]
+
+### Metadata
+- Frequency: first_time
+
+---
+
+## [FEAT-20260404-009] global-buckling-check
+
+**Logged**: 2026-04-04T14:30:29Z
+**Priority**: high
+**Status**: pending
+**Area**: backend
+
+### Requested Capability
+global buckling check
+
+### Summary
+Global buckling analysis for jib
+
+### User Context
+[TODO: add user context]
+
+### Complexity Estimate
+medium
+
+### Suggested Implementation
+[TODO: add suggested implementation]
+
+### Metadata
+- Frequency: first_time
+
+---
+
+## [FEAT-20260404-010] fatigue-analysis
+
+**Logged**: 2026-04-04T14:30:29Z
+**Priority**: medium
+**Status**: pending
+**Area**: backend
+
+### Requested Capability
+fatigue analysis
+
+### Summary
+Fatigue analysis for cyclic loading
+
+### User Context
+[TODO: add user context]
+
+### Complexity Estimate
+medium
+
+### Suggested Implementation
+[TODO: add suggested implementation]
+
+### Metadata
+- Frequency: first_time
+
+---
+
+## [FEAT-20260404-011] seismic-loads
+
+**Logged**: 2026-04-04T14:30:30Z
+**Priority**: medium
+**Status**: pending
+**Area**: backend
+
+### Requested Capability
+seismic loads
+
+### Summary
+Seismic load cases per code
+
+### User Context
+[TODO: add user context]
+
+### Complexity Estimate
+medium
+
+### Suggested Implementation
+[TODO: add suggested implementation]
+
+### Metadata
+- Frequency: first_time
+
+---
+
+## [FEAT-20260404-012] torsion-analysis
+
+**Logged**: 2026-04-04T14:30:40Z
+**Priority**: high
+**Status**: pending
+**Area**: backend
+
+### Requested Capability
+torsion analysis
+
+### Summary
+Torsion from eccentric loads (offset in Z)
+
+### User Context
+[TODO: add user context]
+
+### Complexity Estimate
+medium
+
+### Suggested Implementation
+[TODO: add suggested implementation]
+
+### Metadata
+- Frequency: first_time
+
+---
+
+## [FEAT-20260404-013] buckling-lengths
+
+**Logged**: 2026-04-04T14:30:40Z
+**Priority**: medium
+**Status**: pending
+**Area**: backend
+
+### Requested Capability
+buckling lengths
+
+### Summary
+Input and compute buckling lengths for members
+
+### User Context
+[TODO: add user context]
+
+### Complexity Estimate
+medium
+
+### Suggested Implementation
+[TODO: add suggested implementation]
+
+### Metadata
+- Frequency: first_time
+
+---
+
+## [FEAT-20260404-014] 3d-visualization
+
+**Logged**: 2026-04-04T14:30:40Z
+**Priority**: low
+**Status**: pending
+**Area**: frontend
+
+### Requested Capability
+3d visualization
+
+### Summary
+3D visualization of jib with forces
+
+### User Context
+[TODO: add user context]
+
+### Complexity Estimate
+medium
+
+### Suggested Implementation
+[TODO: add suggested implementation]
+
+### Metadata
+- Frequency: first_time
+
+---
+
+## [FEAT-20260404-015] member-optimization
+
+**Logged**: 2026-04-04T14:30:45Z
+**Priority**: low
+**Status**: pending
+**Area**: backend
+
+### Requested Capability
+member optimization
+
+### Summary
+Suggest optimal section sizes based on utilization
+
+### User Context
+[TODO: add user context]
+
+### Complexity Estimate
+medium
+
+### Suggested Implementation
+[TODO: add suggested implementation]
+
+### Metadata
+- Frequency: first_time
+
+---
+
+## [FEAT-20260404-016] load-combinations
+
+**Logged**: 2026-04-04T14:30:45Z
+**Priority**: medium
+**Status**: pending
+**Area**: backend
+
+### Requested Capability
+load combinations
+
+### Summary
+Automated load combinations (ASCE, Eurocode)
+
+### User Context
+[TODO: add user context]
+
+### Complexity Estimate
+medium
+
+### Suggested Implementation
+[TODO: add suggested implementation]
+
+### Metadata
+- Frequency: first_time
+
+---
+
+## [FEAT-20260404-017] reaction-forces-export
+
+**Logged**: 2026-04-04T14:30:45Z
+**Priority**: low
+**Status**: pending
+**Area**: docs
+
+### Requested Capability
+reaction forces export
+
+### Summary
+Export reaction forces for structural analysis
+
+### User Context
+[TODO: add user context]
+
+### Complexity Estimate
+medium
+
+### Suggested Implementation
+[TODO: add suggested implementation]
+
+### Metadata
+- Frequency: first_time
+
+---
+
+## [FEAT-20260404-018] section-utilization-plot
+
+**Logged**: 2026-04-04T14:30:45Z
+**Priority**: medium
+**Status**: pending
+**Area**: backend
+
+### Requested Capability
+section utilization plot
+
+### Summary
+Utilization ratio plot along jib length
+
+### User Context
+[TODO: add user context]
+
+### Complexity Estimate
+medium
+
+### Suggested Implementation
+[TODO: add suggested implementation]
+
+### Metadata
+- Frequency: first_time
+
+---
+
+## [FEAT-20260404-019] dynamic-analysis
+
+**Logged**: 2026-04-04T14:30:45Z
+**Priority**: medium
+**Status**: pending
+**Area**: backend
+
+### Requested Capability
+dynamic analysis
+
+### Summary
+Dynamic analysis (natural frequency, seismic)
+
+### User Context
+[TODO: add user context]
+
+### Complexity Estimate
+medium
+
+### Suggested Implementation
+[TODO: add suggested implementation]
+
+### Metadata
+- Frequency: first_time
+
+---

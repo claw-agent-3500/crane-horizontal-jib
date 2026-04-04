@@ -221,3 +221,47 @@ Add PDF export using reportlab or matplotlib backend. Keep HTML as primary, add 
 - Tags: pdf, export, reporting
 
 ---
+
+## [LRN-20260404-002] correction
+
+**Logged**: 2026-04-04T14:30:00Z
+**Priority**: critical
+**Status**: pending
+**Area**: backend
+
+### Summary
+Confusing sign convention in chord forces - positive M gives positive (compression) on upper but lower should be tension
+
+### Details
+Current: upper = M/(h*uc), lower = -M/(h*lc). For positive M (hogging at root), upper is in compression (correct), lower is in tension (correct). But signs in output table were confusing - need clearer labels.
+
+### Suggested Action
+[TODO: add suggested action]
+
+### Metadata
+- Source: conversation
+- Tags: sign-convention, chord-forces, correction
+
+---
+
+## [LRN-20260404-003] best_practice
+
+**Logged**: 2026-04-04T14:30:11Z
+**Priority**: medium
+**Status**: pending
+**Area**: backend
+
+### Summary
+Wind loads should be marked distinct from gravity loads in report
+
+### Details
+Wind is horizontal, gravity is vertical. Should visually distinguish wind contribution in SFD/BMD or add separate wind diagram.
+
+### Suggested Action
+[TODO: add suggested action]
+
+### Metadata
+- Source: conversation
+- Tags: wind, visualization
+
+---
