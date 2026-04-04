@@ -18,6 +18,7 @@ from models import CraneModel, AnalysisResult, LoadCase, MAX_POINT_LOADS, MAX_UD
 from validation import validate_model
 from loader import load_model
 from calculations import compute_beam, compute_deflection, compute_stress, compute_truss_forces
+from load_case_summary import compute_load_case_summary
 from report import generate_html
 
 
@@ -65,6 +66,9 @@ def run_analysis(model: CraneModel) -> AnalysisResult:
     x = np.linspace(0, model.jib_length, model.num_points)
     n = len(x)
     load_cases = model.load_cases or [LoadCase(name='Default', coefficients={})]
+
+    # Compute per-load-case summary
+    load_case_results = compute_load_case_summary(model, x, load_cases, _run_single)
 
     # Initialize envelope
     env = {k: np.zeros(n) for k in [
@@ -203,6 +207,7 @@ def run_analysis(model: CraneModel) -> AnalysisResult:
         max_utilization=max_util,
         max_utilization_pos=max_util_pos,
         section_utilization=section_util,
+        load_case_results=load_case_results,
         sections=model.sections,
         model=model,
     )

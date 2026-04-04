@@ -135,6 +135,44 @@ def generate_html(model, result, sweep_result=None) -> str:
         </table>
     </div>'''
 
+    # Load case summary table
+    lc_table = ''
+    if result.load_case_results:
+        for lc in result.load_case_results:
+            status = '✅' if lc['max_utilization'] < 0.7 else ('⚠️' if lc['max_utilization'] < 0.9 else '❌')
+            lc_table += f'''
+        <tr>
+            <td>{lc['name']}</td>
+            <td>{lc['max_V']:.1f}</td>
+            <td>{lc['max_M']:.1f}</td>
+            <td>{lc['max_sigma']:.1f}</td>
+            <td class="{'util-ok' if lc['max_utilization'] < 0.7 else 'util-warn' if lc['max_utilization'] < 0.9 else 'util-fail'}">{lc['max_utilization']:.1%}</td>
+            <td>{lc['tip_delta']*1000:.1f}</td>
+            <td>{lc['wind_pressure']:.0f}</td>
+        </tr>'''
+
+    lc_summary_html = ''
+    if lc_table:
+        lc_summary_html = f'''
+    <div class="card">
+        <h2>📋 Load Case Summary</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Load Case</th>
+                    <th>Max V (kN)</th>
+                    <th>Max M (kN·m)</th>
+                    <th>Max σ (MPa)</th>
+                    <th>Max Utilization</th>
+                    <th>Tip δ (mm)</th>
+                    <th>Wind (Pa)</th>
+                </tr>
+            </thead>
+            <tbody>{lc_table}
+            </tbody>
+        </table>
+    </div>'''
+
     # Per-section forces at section start (pivot point for design)
     section_forces_table = ''
     if result.section_forces_at_start:
@@ -270,6 +308,7 @@ def generate_html(model, result, sweep_result=None) -> str:
     {truss_summary}
     {section_forces_html}
     {util_html}
+    {lc_summary_html}
     <div class="card"><h2>📈 Chord Forces</h2><img src="data:image/png;base64,{chord_b64}" alt="Chord Forces" /></div>
     <div class="card"><h2>📈 Diagonal Forces</h2><img src="data:image/png;base64,{diag_b64}" alt="Diagonal Forces" /></div>
 

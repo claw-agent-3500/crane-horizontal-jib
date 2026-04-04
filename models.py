@@ -139,6 +139,9 @@ class AnalysisResult:
     section_forces_at_start: list = field(default_factory=list)
     worst_trolley_pos: float = 0.0
 
+    # Per-load-case summary results
+    load_case_results: list = field(default_factory=list)  # list of {name, max_V, max_M, max_sigma, max_utilization, tip_delta}
+
     # Grid arrays (no default)
     x: np.ndarray = None
     V_base: np.ndarray = None
