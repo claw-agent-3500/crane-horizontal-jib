@@ -343,7 +343,8 @@ def main():
     results['validation'] = test_validation()
     results['truss_sections'] = test_truss_sections()
     results['wind_analysis'] = test_wind_analysis()
-    results['per_section_forces'] = test_per_section_forces()
+    results["per_section_forces"] = test_per_section_forces()
+    results["report_config"] = test_report_configuration()
     
     # Summary
     print("\n" + "=" * 60)
@@ -361,3 +362,49 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+
+def test_report_configuration():
+    """Test report configuration feature."""
+    print("\n" + "=" * 60)
+    print("TEST 11: Report Configuration")
+    print("=" * 60)
+    
+    from loader import load_model
+    from report import generate_html
+    import sys
+    
+    # Test 1: Default config (all included)
+    model1 = load_model('examples/working_60m/input.yaml')
+    assert model1.report_config.sfd == True
+    assert model1.report_config.bmd == True
+    assert model1.report_config.deflection == True
+    assert model1.report_config.utilization == True
+    assert model1.report_config.load_case_summary == True
+    print("✅ Default config: all sections enabled")
+    
+    # Test 2: Custom config (selective)
+    model2 = load_model('tests/custom_report.yaml')
+    assert model2.report_config.sfd == True
+    assert model2.report_config.bmd == True
+    assert model2.report_config.deflection == False
+    assert model2.report_config.stress == False
+    assert model2.report_config.chord_forces == False
+    assert model2.report_config.load_case_summary == False
+    print("✅ Custom config: selective sections work")
+    
+    # Test 3: Generate minimal report
+    html = generate_html(model2, run_analysis(model2))
+    assert len(html) > 0
+    
+    # Verify excluded sections are NOT in HTML
+    assert 'Deflection Curve' not in html
+    assert 'Stress Distribution' not in html
+    print("✅ Custom config generates smaller HTML")
+    
+    return True
+
+
+# Run the new test
+if __name__ == '__main__':
+    test_report_configuration()
