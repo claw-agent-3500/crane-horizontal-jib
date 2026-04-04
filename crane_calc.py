@@ -215,6 +215,8 @@ def main():
     parser.add_argument('input', help='Path to YAML input file')
     parser.add_argument('-o', '--output', default='report.html',
                         help='Output HTML report path (default: report.html)')
+    parser.add_argument('--csv', action='store_true',
+                        help='Also export results to CSV files')
     parser.add_argument('--no-browser', action='store_true',
                         help='Skip opening the report in browser')
 

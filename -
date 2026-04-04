@@ -1,0 +1,87 @@
+
+
+def main():
+    import sys
+    sys.path.insert(0, '.')
+    parser = argparse.ArgumentParser(
+        description='Tower Crane Jib Calculator — load cases + trolley envelope'
+    )
+    parser.add_argument('input', help='Path to YAML input file')
+    parser.add_argument('-o', '--output', default='report.html',
+                        help='Output HTML report path (default: report.html)')
+    parser.add_argument('--csv', action='store_true',
+                        help='Also export results to CSV files')
+    parser.add_argument('--no-browser', action='store_true',
+                        help='Skip opening the report in browser')
+
+    args = parser.parse_args()
+
+    print(f"📐 Loading crane model from: {args.input}")
+    from loader import load_model
+    model = load_model(args.input)
+    print(f"   {model.name} — {model.jib_length:.0f}m jib, {len(model.sections)} sections")
+    print(f"   E = {model.youngs_modulus / 1e6:.0f} GPa")
+    print(f"   Point loads: {len(model.point_loads)}/{MAX_POINT_LOADS}")
+    print(f"   UDLs: {len(model.udls)}/{MAX_UDLS}")
+    has_truss = any(s.truss for s in model.sections)
+    print(f"   Truss config: {'Yes' if has_truss else 'No'}")
+    if model.trolley:
+        t = model.trolley
+        pmax = t.max_position if t.max_position > 0 else model.jib_length - 2
+        print(f"   Trolley: {t.magnitude:.0f} kN, travel [{t.min_position:.0f}–{pmax:.0f} m]")
+    print(f"   Load cases: {len(model.load_cases)}")
+    for lc in model.load_cases:
+        active = {k: v for k, v in lc.coefficients.items() if v != 1.0}
+        info = ', '.join(f'{k}={v}' for k, v in active.items()) if active else 'all=1.0'
+        print(f"     • {lc.name} [{info}]")
+
+    from validation import validate_model
+    errors = validate_model(model)
+    if errors:
+        print("❌ Validation errors:")
+        for e in errors:
+            print(f"   • {e}")
+        sys.exit(1)
+    print("   ✅ Validation passed")
+
+    print("🔧 Computing envelope (all load cases × trolley positions)...")
+    from crane_calc import run_analysis
+    result = run_analysis(model)
+
+    tip_mm = result.tip_delta * 1000
+    limit_mm = _parse_serviceability_limit(model.serviceability_limit, model.jib_length)
+
+    print(f"   Root: V(0) = {result.reaction_V:.1f} kN, M(0) = {result.reaction_M:.1f} kN·m")
+    print(f"   Max |V|:  {result.max_V:.1f} kN  @ X={result.max_V_pos:.1f} m")
+    print(f"   Max M:    {result.max_M:.1f} kN·m  @ X={result.max_M_pos:.1f} m")
+    print(f"   Max σ:    {result.max_sigma:.1f} MPa  @ X={result.max_sigma_pos:.1f} m")
+    print(f"   Max utilization: {result.max_utilization:.2%} @ X={result.max_utilization_pos:.1f} m")
+    print(f"   Tip δ:    {tip_mm:.1f} mm  ({model.serviceability_limit}={limit_mm:.0f} mm) {'✅' if tip_mm < limit_mm else '⚠️'}")
+    if model.trolley:
+        print(f"   Worst trolley pos: {result.worst_trolley_pos:.1f} m")
+    if has_truss:
+        print(f"   Chord:    upper {result.max_F_upper:.1f} kN (comp), lower {result.max_F_lower:.1f} kN (tens)")
+        print(f"   Diagonal: comp {result.max_F_comp_diag:.1f} kN, tens {result.max_F_tens_diag:.1f} kN")
+
+    print(f"📄 Generating report: {args.output}")
+    from report import generate_html
+    html = generate_html(model, result)
+    Path(args.output).write_text(html)
+    print(f"   ✅ Saved to {args.output}")
+
+    if args.csv:
+        print(f"📊 Exporting CSV files...")
+        from export_csv import export_results_csv
+        csv_files = export_results_csv(model, result, args.output)
+        for f in csv_files:
+            print(f"   ✅ {f}")
+
+    if not args.no_browser:
+        import webbrowser
+        webbrowser.open(f'file://{Path(args.output).absolute()}')
+
+    print("Done! 🏗️")
+
+
+if __name__ == '__main__':
+    main()
