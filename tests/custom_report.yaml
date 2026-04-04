@@ -1,0 +1,41 @@
+
+crane:
+  name: Minimal Report Test
+  jib_length: 30.0
+  jib_height_position: 0.0
+  youngs_modulus: 200000000.0
+
+sections:
+  - name: Main
+    start: 0.0
+    end: 30.0
+    weight_per_length: 1.5
+    area: 0.04
+    moment_of_inertia: 0.01
+    height: 1.5
+    yield_strength: 345.0
+
+load_cases:
+  - name: Working
+    coef_self_weight: 1.0
+
+report:
+  diagrams:
+    sfd: true
+    bmd: true
+    deflection: false
+    stress: false
+    chord_forces: false
+    diagonal_forces: false
+    wind: false
+    utilization: false
+  tables:
+    sections: true
+    loads: true
+    section_forces: false
+    utilization: false
+    load_case_summary: false
+  options:
+    show_schematic: false
+    show_worst_trolley: false
+    show_serviceability: false

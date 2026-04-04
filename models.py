@@ -209,3 +209,33 @@ class SweepResult:
     worst_moment: float
     worst_shear: float
     worst_deflection: float
+
+
+@dataclass
+class ReportConfig:
+    """Configuration for which sections to include in the HTML report."""
+    # Summary
+    summary: bool = True
+    
+    # Diagrams
+    sfd: bool = True
+    bmd: bool = True
+    deflection: bool = True
+    stress: bool = True
+    chord_forces: bool = True
+    diagonal_forces: bool = True
+    wind: bool = True
+    utilization: bool = True
+    
+    # Tables
+    sections_table: bool = True
+    loads_table: bool = True
+    section_forces_table: bool = True
+    utilization_table: bool = True
+    load_case_summary: bool = True
+    
+    # Options
+    show_schematic: bool = True
+    show_worst_trolley: bool = True
+    show_serviceability: bool = True
+    decimal_places: int = 1

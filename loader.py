@@ -2,7 +2,7 @@
 
 import yaml
 
-from models import (
+from models import ReportConfig, (
     CraneModel, Section, PointLoad, UDL, Trolley, LoadCase,
     TrussConfig, DiagonalConfig, DEFAULT_E,
 )
@@ -107,4 +107,35 @@ def load_model(path: str) -> CraneModel:
         serviceability_limit=serviceability,
         trolley=trolley,
         load_cases=load_cases,
+        report_config=ReportConfig() if 'report' not in data else _parse_report_config(data['report']),
+    )
+
+
+def _parse_report_config(data: dict) -> ReportConfig:
+    if not data:
+        return ReportConfig()
+    
+    diagrams = data.get('diagrams', {})
+    tables = data.get('tables', {})
+    options = data.get('options', {})
+    
+    return ReportConfig(
+        summary=data.get('summary', {}).get('include', True),
+        sfd=diagrams.get('sfd', True),
+        bmd=diagrams.get('bmd', True),
+        deflection=diagrams.get('deflection', True),
+        stress=diagrams.get('stress', True),
+        chord_forces=diagrams.get('chord_forces', True),
+        diagonal_forces=diagrams.get('diagonal_forces', True),
+        wind=diagrams.get('wind', True),
+        utilization=diagrams.get('utilization', True),
+        sections_table=tables.get('sections', True),
+        loads_table=tables.get('loads', True),
+        section_forces_table=tables.get('section_forces', True),
+        utilization_table=tables.get('utilization', True),
+        load_case_summary=tables.get('load_case_summary', True),
+        show_schematic=options.get('show_schematic', True),
+        show_worst_trolley=options.get('show_worst_trolley', True),
+        show_serviceability=options.get('show_serviceability', True),
+        decimal_places=options.get('decimal_places', 1),
     )

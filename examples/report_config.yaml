@@ -1,0 +1,33 @@
+# Example Report Configuration
+# Configure which sections to include in the HTML report
+
+report:
+  # Summary section (always included)
+  summary:
+    include: true
+
+  # Diagrams to include
+  diagrams:
+    sfd: true          # Shear Force Diagram
+    bmd: true          # Bending Moment Diagram
+    deflection: true   # Deflection curve
+    stress: true       # Stress distribution
+    chord_forces: true # Chord force diagram
+    diagonal_forces: true # Diagonal force diagram
+    wind: true         # Wind loads diagram (if wind_pressure > 0)
+    utilization: true  # Utilization ratio plot
+
+  # Tables to include
+  tables:
+    sections: true      # Section properties table
+    loads: true        # Applied loads table
+    section_forces: true # Forces at section start
+    utilization: true  # Utilization by section
+    load_case_summary: true # Per-load-case summary
+
+  # Options
+  options:
+    show_schematic: true    # Jib schematic diagram
+    show_worst_trolley: true # Show worst trolley position
+    show_serviceability: true # Show serviceability check
+    decimal_places: 1       # Decimal places for display

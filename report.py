@@ -1,4 +1,5 @@
 """HTML report generator."""
+from models import ReportConfig
 from plotting.utilization_plot import plot_utilization
 from plotting.wind_plot import plot_wind_diagram
 
