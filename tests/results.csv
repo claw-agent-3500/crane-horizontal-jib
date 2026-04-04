@@ -1,0 +1,12 @@
+Metric,Value,Unit,At_X
+Root_Shear_V,263.05,kN,0
+Root_Moment_M,10981.0,kN·m,0
+Max_Shear,263.05,kN,0.0
+Max_Moment,10981.0,kN·m,0.0
+Max_Stress,339.8880952380953,MPa,0.0
+Max_Utilization,0.9852,,0.0
+Tip_Deflection,2041.2226132619837,mm,60.0
+Max_Upper_Chord,3143.490841067573,kN,
+Max_Lower_Chord,2111.730769230769,kN,
+Max_Comp_Diagonal,372.0088775822427,kN,
+Max_Tens_Diagonal,372.0088775822427,kN,

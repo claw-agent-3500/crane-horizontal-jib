@@ -1,0 +1,19 @@
+crane:
+  name: "Invalid"
+  jib_length: 60.0
+
+sections:
+  - name: "A"
+    start: 0.0
+    end: 20.0
+    weight_per_length: 1.0
+    area: 0.01
+    moment_of_inertia: 0.001
+    height: 1.0
+  - name: "B"
+    start: 25.0
+    end: 60.0
+    weight_per_length: 1.0
+    area: 0.01
+    moment_of_inertia: 0.001
+    height: 1.0

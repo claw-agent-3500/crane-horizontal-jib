@@ -1,0 +1,3 @@
+Type,Name,Position,Start,End,Magnitude,Wind_Area
+Point,Tip Sheave + Hoist,60.0,,,15.0,1.5
+Point,Counterweight Connection,0.5,,,8.0,0.0

@@ -1,0 +1,17 @@
+crane:
+  name: Serviceability Test
+  jib_length: 60.0
+  serviceability_limit: "L/400"
+
+sections:
+  - name: Root
+    start: 0.0
+    end: 60.0
+    weight_per_length: 2.0
+    area: 0.05
+    moment_of_inertia: 0.02
+    height: 2.0
+
+load_cases:
+  - name: Test
+    coef_self_weight: 1.0

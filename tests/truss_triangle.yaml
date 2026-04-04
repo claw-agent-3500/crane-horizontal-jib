@@ -1,0 +1,20 @@
+crane:
+  name: "Triangle"
+  jib_length: 30.0
+
+sections:
+  - name: "Main"
+    start: 0.0
+    end: 30.0
+    weight_per_length: 1.5
+    area: 0.04
+    moment_of_inertia: 0.01
+    height: 1.5
+    truss:
+      upper_chords: 1
+      lower_chords: 2
+      compression_diagonal: { angle: 45, present: true }
+
+load_cases:
+  - name: "Test"
+    coef_self_weight: 1.0

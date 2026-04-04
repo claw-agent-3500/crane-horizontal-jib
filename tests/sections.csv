@@ -1,0 +1,6 @@
+Section,X_Start,X_End,Length,Weight_kN_m,Area,I_z,Height,Yield_MPa,Wind_Area
+Root Section,0.0,12.0,12.0,2.8,0.085,0.042,2.6,345.0,8.5
+Mid-Root Section,12.0,24.0,12.0,2.2,0.068,0.031,2.2,345.0,6.8
+Mid Section,24.0,40.0,16.0,1.6,0.048,0.018,1.8,345.0,4.8
+Tip Section,40.0,55.0,15.0,1.0,0.032,0.009,1.4,345.0,3.2
+Tip Assembly,55.0,60.0,5.0,0.8,0.025,0.005,1.2,345.0,2.0
