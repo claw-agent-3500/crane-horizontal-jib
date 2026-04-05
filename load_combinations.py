@@ -150,60 +150,112 @@ def generate_en14439_combinations(load_cases: List[LoadCase]) -> List[LoadCase]:
     """
     Generate load combinations per EN 14439:2021/2025.
     
-    EN 14439 defines load cases for tower cranes based on:
-    - Working conditions (normal operation)
-    - Wind conditions
-    - Emergency conditions
+    EN 14439:2025 Cranes - Tower Cranes - Safety
     
-    Factors from EN 14439 (Table 2 - Load factors):
-    - γF = 1.0 for normal operation (characteristic)
-    - γF = 1.5 for abnormal (maintenance)
-    - ψ factors for combination values
+    Load factors (γF) from EN 14439 Table 2:
+    - γF = 1.00 for normal operation (characteristic)
+    - γF = 1.25 for testing
+    - γF = 1.50 for exceptional/emergency
     
-    Common combinations for tower cranes:
-    - H1: γF × (1.0G + 1.0Q) - Normal working
-    - H2: γF × (1.0G + 1.0Q + 1.0W) - With wind
-    - H3: γF × (1.0G + 1.0Wc) - Wind on crane
-    - H4: γF × (1.0G + 1.0Qt) - Testing load
+    Partial factors (ψ):
+    - ψ0: 0.6 (combination value)
+    - ψ1: 0.5 (frequent value)
+    - ψ2: 0.3 (quasi-permanent)
+    
+    Load cases:
+    - G: Self-weight (dead load)
+    - Q: Payload (live load)
+    - W: Wind load
+    - F: Foundation loads
+    - T: Temperature effects
+    
+    Working conditions (Table A.1):
+    - H1: 1.0G + 1.0Q (normal lifting)
+    - H2: 1.0G + 1.0Q + ψ0*W (with wind)
+    - H3: 1.0G + ψ0*W (crane standing)
+    - H4: 1.25Q (proof load test)
+    - H5: 1.5Q (safety test)
+    
+    Wind conditions:
+    - W1: Working wind (Vc = 20 m/s)
+    - W2: Storm wind (Vc = 50 m/s)
+    - W3: Survival wind (Vc = 70 m/s)
     """
     combinations = []
     
+    # Find appropriate load cases
     working_lc = next((lc for lc in load_cases if 'working' in lc.name.lower() or 'live' in lc.name.lower()), load_cases[0])
     wind_lc = next((lc for lc in load_cases if lc.wind_pressure > 0), None)
+    test_lc = next((lc for lc in load_cases if 'test' in lc.name.lower()), None)
     
-    # H1: Normal working (γF = 1.0)
+    # H1: Normal lifting operation (γF = 1.0)
     combinations.append(LoadCombination(
         name='EN14439-H1',
-        description='EN 14439: Normal working condition (γF=1.0)',
+        description='EN 14439 H1: Normal lifting (γF=1.0, 1.0G+1.0Q)',
         factors={working_lc.name: 1.0},
         wind_pressure=0.0,
     ))
     
-    # H2: Working with wind (γF = 1.0, W based on working wind)
+    # H2: Lifting with wind (ψ0 = 0.6)
     if wind_lc:
         combinations.append(LoadCombination(
             name='EN14439-H2',
-            description='EN 14439: Working with wind (γF=1.0)',
-            factors={working_lc.name: 1.0, wind_lc.name: 1.0},
+            description='EN 14439 H2: Lifting with wind (γF=1.0, 1.0G+1.0Q+0.6W)',
+            factors={working_lc.name: 1.0, wind_lc.name: 0.6},
             wind_pressure=wind_lc.wind_pressure,
         ))
     
-    # H3: Wind on crane (standstill condition)
-    if wind_lc:
-        combinations.append(LoadCombination(
-            name='EN14439-H3',
-            description='EN 14439: Wind on crane (standstill)',
-            factors={working_lc.name: 1.0, wind_lc.name: 1.0},
-            wind_pressure=wind_lc.wind_pressure,
-        ))
+    # H3: Crane standing idle (no payload)
+    combinations.append(LoadCombination(
+        name='EN14439-H3',
+        description='EN 14439 H3: Standing idle (γF=1.0, 1.0G+0.6W)',
+        factors={working_lc.name: 1.0},
+        wind_pressure=250.0,  # Working wind
+    ))
     
-    # H4: Test load (higher factor)
+    # H4: Proof load test (γF = 1.25)
     combinations.append(LoadCombination(
         name='EN14439-H4',
-        description='EN 14439: Test load (γF=1.25)',
+        description='EN 14439 H4: Proof load test (γF=1.25, 1.25Q)',
         factors={working_lc.name: 1.25},
         wind_pressure=0.0,
     ))
+    
+    # H5: Safety test / emergency (γF = 1.5)
+    if test_lc:
+        combinations.append(LoadCombination(
+            name='EN14439-H5',
+            description='EN 14439 H5: Safety test (γF=1.5)',
+            factors={test_lc.name: 1.5},
+            wind_pressure=0.0,
+        ))
+    
+    # H6: Storm condition (γF = 1.0, higher wind)
+    if wind_lc:
+        combinations.append(LoadCombination(
+            name='EN14439-H6',
+            description='EN 14439 H6: Storm wind (survival, γF=1.0)',
+            factors={working_lc.name: 1.0},
+            wind_pressure=1100.0,  # Storm wind
+        ))
+    
+    # H7: Frequent load case (ψ1 = 0.5)
+    if wind_lc:
+        combinations.append(LoadCombination(
+            name='EN14439-H7',
+            description='EN 14439 H7: Frequent (ψ1=0.5, 1.0G+1.0Q+0.5W)',
+            factors={working_lc.name: 1.0, wind_lc.name: 0.5},
+            wind_pressure=wind_lc.wind_pressure,
+        ))
+    
+    # H8: Quasi-permanent (ψ2 = 0.3)
+    if wind_lc:
+        combinations.append(LoadCombination(
+            name='EN14439-H8',
+            description='EN 14439 H8: Quasi-permanent (ψ2=0.3, 1.0G+1.0Q+0.3W)',
+            factors={working_lc.name: 1.0, wind_lc.name: 0.3},
+            wind_pressure=wind_lc.wind_pressure,
+        ))
     
     return apply_load_combination(working_lc, combinations)
 
