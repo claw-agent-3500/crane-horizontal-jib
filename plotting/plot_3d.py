@@ -72,7 +72,7 @@ def plot_3d_schematic(model, result=None) -> str:
     
     # Trolley position
     if model.trolley:
-        tx = model.trolley.position
+        tx = model.trolley.max_position
         ax.scatter([tx], [H + truss_height/2 + 0.3], [0], c='cyan', s=150, 
                    marker='s', edgecolors='white', linewidth=2, zorder=6)
         ax.text(tx, H + truss_height + 0.5, 0, 'Trolley', color='cyan', fontsize=9)

@@ -25,7 +25,7 @@ def compute_torsion(model: CraneModel, x: np.ndarray, V: np.ndarray,
     }
     
     # Get trolley position from model
-    trolley_x = model.trolley.position if model.trolley else model.jib_length / 2
+    trolley_x = (model.trolley.min_position + model.trolley.max_position) / 2 if model.trolley else model.jib_length / 2
     
     # For each x, compute torsion from point loads and UDLs
     for i, xi in enumerate(x):

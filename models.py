@@ -96,7 +96,8 @@ class LoadCase:
     """A load case with named coefficients for each load."""
     name: str
     coefficients: dict = field(default_factory=dict)
-    wind_pressure: float = 0.0  # Pa (0 = no wind for this case)
+    wind_pressure: float = 0.0
+    description: str = ""
 
     def coef(self, load_name: str) -> float:
         """Get coefficient for a named load. Defaults to 1.0."""

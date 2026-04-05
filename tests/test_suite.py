@@ -318,6 +318,63 @@ def test_per_section_forces():
     return True
 
 
+
+def test_global_buckling():
+    """Test global buckling analysis (Euler formula)."""
+    from calculations.buckling import compute_global_buckling
+    model = load_model('examples/working_60m/input.yaml')
+    result = run_analysis(model)
+    buckling = compute_global_buckling(result.model, result.x, result.M, result.V)
+    print(f"✅ Buckling: min SF={buckling['min_safety']:.2f}")
+    return True
+
+def test_torsion_analysis():
+    """Test torsional analysis."""
+    from calculations.torsion import compute_torsion
+    model = load_model('examples/working_60m/input.yaml')
+    result = run_analysis(model)
+    torsion = compute_torsion(result.model, result.x, result.V, result.model.point_loads, result.model.udls)
+    print(f"✅ Torsion: max={torsion['max_torsion']:.1f} kN·m")
+    return True
+
+def test_fatigue_analysis():
+    """Test fatigue analysis (S-N curve)."""
+    from calculations.fatigue import compute_fatigue_damage
+    model = load_model('examples/working_60m/input.yaml')
+    result = run_analysis(model)
+    fatigue = compute_fatigue_damage(result.model, result, model.load_cases[0])
+    print(f"✅ Fatigue: damage={fatigue.damage:.6f}, life={fatigue.safe_life:.1f} years")
+    return True
+
+def test_load_combinations():
+    """Test ASCE/Eurocode load combinations."""
+    from load_combinations import generate_asce_combinations, generate_eurocode_combinations
+    model = load_model('examples/working_60m/input.yaml')
+    asce = generate_asce_combinations(model.load_cases)
+    euro = generate_eurocode_combinations(model.load_cases)
+    print(f"✅ Load combos: {len(asce)} ASCE + {len(euro)} Eurocode")
+    return True
+
+def test_seismic_analysis():
+    """Test seismic load analysis."""
+    from seismic_analysis import compute_seismic_response, SeismicParams
+    import numpy as np
+    model = load_model('examples/working_60m/input.yaml')
+    x = np.linspace(0, model.jib_length, 100)
+    seismic = SeismicParams(Ss=1.0, S1=0.4, site_class='D', design_category='E')
+    response = compute_seismic_response(model, x, seismic)
+    print(f"✅ Seismic: V={response['base_shear']:.1f} kN, M={response['base_moment']:.1f} kN·m")
+    return True
+
+def test_3d_visualization():
+    """Test 3D visualization generation."""
+    from plotting.plot_3d import plot_3d_schematic
+    model = load_model('examples/working_60m/input.yaml')
+    result = run_analysis(model)
+    b64 = plot_3d_schematic(model, result)
+    print(f"✅ 3D viz: {len(b64)} chars")
+    return True
+
 def main():
     """Run all tests."""
     print("\n" + "=" * 60)
@@ -345,6 +402,12 @@ def main():
     results['wind_analysis'] = test_wind_analysis()
     results["per_section_forces"] = test_per_section_forces()
     results["report_config"] = test_report_configuration()
+    results["global_buckling"] = test_global_buckling()
+    results["torsion"] = test_torsion_analysis()
+    results["fatigue"] = test_fatigue_analysis()
+    results["load_combinations"] = test_load_combinations()
+    results["seismic"] = test_seismic_analysis()
+    results["visualization_3d"] = test_3d_visualization()
     
     # Summary
     print("\n" + "=" * 60)
