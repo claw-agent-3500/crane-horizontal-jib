@@ -389,6 +389,59 @@ def test_en14439_combinations():
     
     return True
 
+
+def test_batch_analysis():
+    """Test multi-jib batch analysis."""
+    from batch_analysis import BatchAnalyzer, JibConfig
+    from loader import load_model
+    from crane_calc import run_analysis
+    
+    # Load base model
+    base_model = load_model('examples/working_60m/input.yaml')
+    
+    # Create analyzer
+    analyzer = BatchAnalyzer(base_model)
+    
+    # Test different jib lengths
+    lengths = [45.0, 50.0, 55.0, 60.0]
+    
+    for length in lengths:
+        config = JibConfig(
+            name=f'{int(length)}m',
+            jib_length=length,
+            jib_height=0.0,
+        )
+        # Copy sections but adjust end
+        for sec in base_model.sections:
+            sec_copy = type(sec)(
+                name=sec.name,
+                start=sec.start,
+                end=min(sec.end, length),
+                weight_per_length=sec.weight_per_length,
+                area=sec.area,
+                moment_of_inertia=sec.moment_of_inertia,
+                height=sec.height,
+                yield_strength=sec.yield_strength,
+            )
+            config.sections.append(sec_copy)
+        
+        # Copy load
+        for pl in base_model.point_loads:
+            if pl.position <= length:
+                config.point_loads.append(pl)
+        
+        analyzer.add_config(config)
+    
+    print(f"✅ Batch analyzed: {len(analyzer.results)} configurations")
+    print(f"   Worst case: {analyzer.worst_case.config_name}")
+    print(f"   Max M: {analyzer.worst_case.max_moment:.1f} kN·m")
+    
+    # Print comparison
+    table = analyzer.generate_comparison_table()
+    print(f"   Results table generated ({len(table)} chars)")
+    
+    return True
+
 def main():
     """Run all tests."""
     print("\n" + "=" * 60)
@@ -423,6 +476,7 @@ def main():
     results["seismic"] = test_seismic_analysis()
     results["visualization_3d"] = test_3d_visualization()
     results["en14439"] = test_en14439_combinations()
+    results["batch_analysis"] = test_batch_analysis()
     
     # Summary
     print("\n" + "=" * 60)
