@@ -128,3 +128,21 @@ def export_batch_json(analyzer, file_path: str = None) -> str:
             f.write(json_str)
     
     return json_str
+
+
+def add_reactions_to_json(model, result, json_data: dict):
+    """Add reaction forces to JSON export."""
+    from models import compute_reactions
+    
+    reactions = compute_reactions(model, result.V, result.M)
+    
+    json_data['reactions'] = [
+        {
+            'position_m': r.x,
+            'shear_kN': r.shear,
+            'moment_kNm': r.moment,
+        }
+        for r in reactions
+    ]
+    
+    return json_data

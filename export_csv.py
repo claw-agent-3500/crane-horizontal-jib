@@ -66,3 +66,18 @@ def export_results_csv(model, result, output_path: str):
                 writer.writerow([u['section'], u['x'], u['sigma'], u['yield_strength'], u['utilization']])
     
     return [str(output_dir / f) for f in ['sections.csv', 'loads.csv', 'results.csv', 'forces_at_sections.csv', 'utilization.csv']]
+
+
+def export_reactions(model, result, file_path: str):
+    """Export reaction forces to CSV."""
+    from models import compute_reactions
+    
+    reactions = compute_reactions(model, result.V, result.M)
+    
+    with open(file_path, 'w', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow(['Position (m)', 'Shear (kN)', 'Moment (kN·m)'])
+        for r in reactions:
+            writer.writerow([r.x, r.shear, r.moment])
+    
+    print(f"✅ Exported reactions to {file_path}")

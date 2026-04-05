@@ -243,3 +243,28 @@ class SweepResult:
     worst_deflection: float
 
 
+
+
+@dataclass
+class ReactionForces:
+    """Reaction forces at support."""
+    x: float  # position (m)
+    shear: float  # kN (vertical reaction)
+    moment: float  # kN·m (moment reaction)
+
+
+def compute_reactions(model, V: np.ndarray, M: np.ndarray) -> list:
+    """Compute reaction forces at root (x=0)."""
+    reactions = []
+    
+    # Root reaction = negative of shear/moment at root
+    root_shear = -V[0] if len(V) > 0 else 0
+    root_moment = -M[0] if len(M) > 0 else 0
+    
+    reactions.append(ReactionForces(
+        x=0.0,
+        shear=root_shear,
+        moment=root_moment,
+    ))
+    
+    return reactions
