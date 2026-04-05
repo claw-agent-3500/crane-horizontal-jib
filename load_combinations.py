@@ -141,3 +141,82 @@ def generate_eurocode_combinations(load_cases: List[LoadCase]) -> List[LoadCase]
         ))
     
     return apply_load_combination(working_lc, combinations)
+
+# EN 14439:2021/2025 - Cranes - Tower Cranes
+# Safety for construction - Tower Cranes
+# Load combinations specific to tower cranes
+
+def generate_en14439_combinations(load_cases: List[LoadCase]) -> List[LoadCase]:
+    """
+    Generate load combinations per EN 14439:2021/2025.
+    
+    EN 14439 defines load cases for tower cranes based on:
+    - Working conditions (normal operation)
+    - Wind conditions
+    - Emergency conditions
+    
+    Factors from EN 14439 (Table 2 - Load factors):
+    - γF = 1.0 for normal operation (characteristic)
+    - γF = 1.5 for abnormal (maintenance)
+    - ψ factors for combination values
+    
+    Common combinations for tower cranes:
+    - H1: γF × (1.0G + 1.0Q) - Normal working
+    - H2: γF × (1.0G + 1.0Q + 1.0W) - With wind
+    - H3: γF × (1.0G + 1.0Wc) - Wind on crane
+    - H4: γF × (1.0G + 1.0Qt) - Testing load
+    """
+    combinations = []
+    
+    working_lc = next((lc for lc in load_cases if 'working' in lc.name.lower() or 'live' in lc.name.lower()), load_cases[0])
+    wind_lc = next((lc for lc in load_cases if lc.wind_pressure > 0), None)
+    
+    # H1: Normal working (γF = 1.0)
+    combinations.append(LoadCombination(
+        name='EN14439-H1',
+        description='EN 14439: Normal working condition (γF=1.0)',
+        factors={working_lc.name: 1.0},
+        wind_pressure=0.0,
+    ))
+    
+    # H2: Working with wind (γF = 1.0, W based on working wind)
+    if wind_lc:
+        combinations.append(LoadCombination(
+            name='EN14439-H2',
+            description='EN 14439: Working with wind (γF=1.0)',
+            factors={working_lc.name: 1.0, wind_lc.name: 1.0},
+            wind_pressure=wind_lc.wind_pressure,
+        ))
+    
+    # H3: Wind on crane (standstill condition)
+    if wind_lc:
+        combinations.append(LoadCombination(
+            name='EN14439-H3',
+            description='EN 14439: Wind on crane (standstill)',
+            factors={working_lc.name: 1.0, wind_lc.name: 1.0},
+            wind_pressure=wind_lc.wind_pressure,
+        ))
+    
+    # H4: Test load (higher factor)
+    combinations.append(LoadCombination(
+        name='EN14439-H4',
+        description='EN 14439: Test load (γF=1.25)',
+        factors={working_lc.name: 1.25},
+        wind_pressure=0.0,
+    ))
+    
+    return apply_load_combination(working_lc, combinations)
+
+
+def generate_all_load_combinations(load_cases: List[LoadCase]) -> dict:
+    """
+    Generate all load combinations from all standards.
+    
+    Returns:
+        dict with keys: 'asce', 'eurocode', 'en14439'
+    """
+    return {
+        'asce': generate_asce_combinations(load_cases),
+        'eurocode': generate_eurocode_combinations(load_cases),
+        'en14439': generate_en14439_combinations(load_cases),
+    }

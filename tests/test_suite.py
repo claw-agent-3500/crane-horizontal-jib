@@ -375,6 +375,20 @@ def test_3d_visualization():
     print(f"✅ 3D viz: {len(b64)} chars")
     return True
 
+
+def test_en14439_combinations():
+    """Test EN 14439:2021/2025 load combinations."""
+    from load_combinations import generate_en14439_combinations
+    
+    model = load_model('examples/working_60m/input.yaml')
+    en14439 = generate_en14439_combinations(model.load_cases)
+    
+    print(f"✅ EN 14439 combinations: {len(en14439)}")
+    for lc in en14439:
+        print(f"   - {lc.name}: {lc.description}")
+    
+    return True
+
 def main():
     """Run all tests."""
     print("\n" + "=" * 60)
@@ -408,6 +422,7 @@ def main():
     results["load_combinations"] = test_load_combinations()
     results["seismic"] = test_seismic_analysis()
     results["visualization_3d"] = test_3d_visualization()
+    results["en14439"] = test_en14439_combinations()
     
     # Summary
     print("\n" + "=" * 60)
