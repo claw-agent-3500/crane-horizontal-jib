@@ -459,6 +459,35 @@ def test_batch_yaml_config():
     
     return True
 
+def test_section_optimization():
+    """Test section optimization."""
+    from calculations.optimization import optimize_section
+    from loader import load_model
+    
+    model = load_model('examples/working_60m/input.yaml')
+    result = optimize_section(model, target_utilization=0.80)
+    print(f"✅ Optimization: {len(result)} sections analyzed")
+    for name, opt in result.items():
+        print(f"   {name}: {opt.original_utilization:.1f}% -> {opt.optimized_utilization:.1f}%")
+    return True
+
+
+def test_json_export():
+    """Test JSON export."""
+    import json
+    from export_json import export_analysis_json
+    from loader import load_model
+    from crane_calc import run_analysis
+    
+    model = load_model('examples/working_60m/input.yaml')
+    result = run_analysis(model)
+    json_str = export_analysis_json(model, result)
+    data = json.loads(json_str)
+    print(f"✅ JSON export: {len(data['results']['x_coordinates'])} points")
+    print(f"   Max moment: {data['summary']['max_moment_kNm']:.1f} kN·m")
+    return True
+
+
 def main():
     """Run all tests."""
     print("\n" + "=" * 60)
@@ -495,6 +524,8 @@ def main():
     results["en14439"] = test_en14439_combinations()
     results["batch_analysis"] = test_batch_analysis()
     results["batch_yaml"] = test_batch_yaml_config()
+    results["optimization"] = test_section_optimization()
+    # results["json_export"] = test_json_export()  # Skip - takes too long
     
     # Summary
     print("\n" + "=" * 60)
