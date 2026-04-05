@@ -268,3 +268,15 @@ def compute_reactions(model, V: np.ndarray, M: np.ndarray) -> list:
     ))
     
     return reactions
+
+
+@dataclass
+class CounterJibConfig:
+    """Configuration for counterjib analysis."""
+    length: float  # m
+    height: float = 0.0  # m (height position)
+    counterweight: float = 0.0  # kN (static)
+    counterweight_position: float = 0.0  # m from root
+    ballasting: float = 0.0  # kN additional ballast
+    sections: list = field(default_factory=list)
+    truss_config: Optional[TrussConfig] = None

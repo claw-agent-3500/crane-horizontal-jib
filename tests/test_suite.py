@@ -488,6 +488,51 @@ def test_json_export():
     return True
 
 
+
+def test_counterjib_analysis():
+    """Test counterjib structural analysis."""
+    from calculations.counterjib import create_counterjib_model
+    from crane_calc import run_analysis
+    from models import LoadCase
+    import numpy as np
+    
+    # Create counterjib model
+    model = create_counterjib_model(
+        length=15.0,
+        counterweight=200.0,
+        counterweight_position=12.0,
+        ballasting=100.0,
+    )
+    
+    # Add load case
+    model.load_cases.append(LoadCase(
+        name='Counterweight',
+        coefficients={'self_weight': 1.0, 'counterweight': 1.0},
+    ))
+    
+    # Run analysis
+    result = run_analysis(model)
+    
+    max_moment = float(np.max(np.abs(result.M)))
+    max_stress = float(np.max(result.sigma))
+    tip_defl = float(result.delta[-1])
+    
+    print(f"✅ Counterjib: M={max_moment:.0f}kN·m, σ={max_stress:.0f}MPa, δ={tip_defl:.0f}mm")
+    
+    # Quick formula check
+    from calculations.counterjib import compute_counterjib_moment_at_root
+    m_calc = compute_counterjib_moment_at_root(
+        counterweight=200.0,
+        counterweight_position=12.0,
+        ballasting=100.0,
+        length=15.0,
+        self_weight_per_m=1.8,
+    )
+    print(f"   Quick calc M_root: {m_calc:.0f} kN·m")
+    
+    return True
+
+
 def main():
     """Run all tests."""
     print("\n" + "=" * 60)
@@ -525,7 +570,8 @@ def main():
     results["batch_analysis"] = test_batch_analysis()
     results["batch_yaml"] = test_batch_yaml_config()
     results["optimization"] = test_section_optimization()
-    # results["json_export"] = test_json_export()  # Skip - takes too long
+    # results["json_export"] = test_json_export()
+    results["counterjib"] = test_counterjib_analysis()  # Skip - takes too long
     
     # Summary
     print("\n" + "=" * 60)
