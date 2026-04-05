@@ -442,6 +442,23 @@ def test_batch_analysis():
     
     return True
 
+
+def test_batch_yaml_config():
+    """Test batch analysis from YAML config file."""
+    from batch_analysis import run_batch_from_config
+    
+    # Run batch analysis from config file
+    analyzer = run_batch_from_config('examples/batch_config.yaml')
+    
+    print(f"✅ Batch config loaded: {len(analyzer.results)} jib configurations")
+    for r in analyzer.results:
+        print(f"   {r.config_name}: M={r.max_moment:.0f}kN·m, σ={r.max_stress:.0f}MPa, util={r.max_utilization:.1f}%")
+    
+    worst = analyzer.worst_case
+    print(f"   Worst: {worst.config_name}")
+    
+    return True
+
 def main():
     """Run all tests."""
     print("\n" + "=" * 60)
@@ -477,6 +494,7 @@ def main():
     results["visualization_3d"] = test_3d_visualization()
     results["en14439"] = test_en14439_combinations()
     results["batch_analysis"] = test_batch_analysis()
+    results["batch_yaml"] = test_batch_yaml_config()
     
     # Summary
     print("\n" + "=" * 60)

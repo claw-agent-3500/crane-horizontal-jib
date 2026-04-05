@@ -1,0 +1,160 @@
+# Batch Analysis Configuration
+# Define multiple jib configurations to analyze in one run
+# Designer-specified combinations
+
+analysis_name: "Crane Fleet Comparison"
+
+# Base model (inherited by all unless overridden)
+base:
+  input_file: "examples/working_60m/input.yaml"
+
+# Jib combinations to analyze
+# Each entry defines a unique jib configuration
+jibs:
+  - name: "TC7030-12 (60m)"
+    # Override base model parameters
+    jib_length: 60.0
+    jib_height_position: 0.0
+    # Custom sections (if different from base)
+    sections:
+      - name: Root
+        start: 0.0
+        end: 10.0
+        weight_per_length: 2.5
+        area: 0.05
+        moment_of_inertia: 0.015
+        height: 1.8
+        yield_strength: 345.0
+      - name: Mid
+        start: 10.0
+        end: 40.0
+        weight_per_length: 2.0
+        area: 0.04
+        moment_of_inertia: 0.012
+        height: 1.6
+        yield_strength: 345.0
+      - name: Tip
+        start: 40.0
+        end: 60.0
+        weight_per_length: 1.5
+        area: 0.03
+        moment_of_inertia: 0.008
+        height: 1.4
+        yield_strength: 345.0
+    
+    # Load positions for this config
+    point_loads:
+      - name: payload
+        position: 45.0
+        magnitude: 120.0
+    
+    # Load cases for this config
+    load_cases:
+      - name: Working
+        coefficients:
+          self_weight: 1.0
+          payload: 1.0
+        wind_pressure: 250.0
+
+  - name: "TC7030-12 (55m)"
+    jib_length: 55.0
+    jib_height_position: 0.0
+    # Uses base sections scaled
+    section_scaling: 0.9  # scale lengths by this factor
+    
+  - name: "TC7030-12 (50m)"
+    jib_length: 50.0
+    section_scaling: 0.8
+
+  - name: "TC7030-15 (65m)"
+    jib_length: 65.0
+    jib_height_position: 0.0
+    # Different section properties
+    sections:
+      - name: Root
+        start: 0.0
+        end: 12.0
+        weight_per_length: 3.0
+        area: 0.06
+        moment_of_inertia: 0.018
+        height: 2.0
+        yield_strength: 345.0
+      - name: Main
+        start: 12.0
+        end: 50.0
+        weight_per_length: 2.5
+        area: 0.05
+        moment_of_inertia: 0.015
+        height: 1.8
+        yield_strength: 345.0
+      - name: Tip
+        start: 50.0
+        end: 65.0
+        weight_per_length: 1.8
+        area: 0.035
+        moment_of_inertia: 0.010
+        height: 1.5
+        yield_strength: 345.0
+    
+    point_loads:
+      - name: payload
+        position: 50.0
+        magnitude: 150.0
+
+  - name: "TC7030-18 (70m)"
+    jib_length: 70.0
+    sections:
+      - name: Root
+        start: 0.0
+        end: 15.0
+        weight_per_length: 3.5
+        area: 0.07
+        moment_of_inertia: 0.020
+        height: 2.2
+        yield_strength: 345.0
+      - name: Mid
+        start: 15.0
+        end: 55.0
+        weight_per_length: 2.8
+        area: 0.055
+        moment_of_inertia: 0.016
+        height: 1.9
+        yield_strength: 345.0
+      - name: Tip
+        start: 55.0
+        end: 70.0
+        weight_per_length: 2.0
+        area: 0.04
+        moment_of_inertia: 0.012
+        height: 1.6
+        yield_strength: 345.0
+
+# Analysis options
+options:
+  # Serviceability limits to check
+  serviceability:
+    - L/250
+    - L/300
+  
+  # Yield strength (MPa)
+  yield_strength: 345.0
+  
+  # Generate comparison report
+  output:
+    comparison_table: true
+    detailed_report_per_jib: true
+    export_csv: true
+    csv_prefix: "batch_results"
+  
+  # Filters
+  filters:
+    max_utilization: 100.0  # %
+    max_deflection_mm: 240   # mm
+    
+# Selection criteria (for auto-selecting best jib)
+selection_criteria:
+  primary: "utilization"  # minimize utilization
+  secondary: "deflection"  # then minimize deflection
+  constraints:
+    max_utilization: 90.0  # must be under 90%
+    max_deflection: "L/250"
