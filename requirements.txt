@@ -1,0 +1,18 @@
+# crane-jib-calc requirements
+
+# Core dependencies
+numpy>=1.21.0
+matplotlib>=3.5.0
+PyYAML>=6.0
+
+# Python stdlib (no install needed)
+# - argparse
+# - dataclasses  
+# - datetime
+# - typing
+# - pathlib
+# - json
+# - csv
+# - io
+# - base64
+# - sys
