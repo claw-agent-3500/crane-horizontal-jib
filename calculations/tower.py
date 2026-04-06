@@ -109,3 +109,86 @@ def create_tower_sections(n: int, start: float = 0.0) -> List[TowerSection]:
             height=1.8, width=1.8, yield_strength=345.0
         ) for i in range(n)
     ]
+
+
+def compute_mast_sfd_bmd(
+    parts: List[CranePartLoad],
+    sections: List[TowerSection],
+    wind_pressure: float = 0.0,
+) -> dict:
+    """
+    Compute SFD and BMD along mast (cantilever from foundation).
+    
+    The mast is fixed at ground (foundation) and loads act from above.
+    """
+    n_points = len(sections)
+    
+    # Heights at each section top
+    heights = [s.end_height for s in sections]
+    
+    # Initialize arrays
+    shear = np.zeros(n_points)
+    moment = np.zeros(n_points)
+    
+    # Calculate from top to bottom (like cantilever load)
+    # At each height, shear = sum of horizontal forces above
+    # Moment = sum of (horizontal force × distance from point)
+    
+    for i, h in enumerate(heights):
+        # Get cumulative loads at this height
+        loads = compute_cumulative_loads(parts, h)
+        
+        # Shear = Fx (horizontal force)
+        shear[i] = loads['Fx']
+        
+        # Moment = My (tipping moment from above)
+        moment[i] = loads['My']
+    
+    return {
+        'heights': heights,
+        'shear_kN': shear,
+        'moment_kNm': moment,
+    }
+
+
+def plot_mast_sfd_bmd(mast_results: dict) -> str:
+    """Generate SFD and BMD for mast."""
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+    
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4))
+    fig.patch.set_facecolor('#1e1e2e')
+    
+    h = mast_results['heights']
+    V = mast_results['shear_kN']
+    M = mast_results['moment_kNm']
+    
+    # SFD
+    ax1.set_facecolor('#1e1e2e')
+    ax1.plot(V, h, 'b-', linewidth=2)
+    ax1.fill_betweenx(h, V, alpha=0.3, color='blue')
+    ax1.set_xlabel('Shear V (kN)', color='#aaa')
+    ax1.set_ylabel('Height (m)', color='#aaa')
+    ax1.set_title('Shear Force Diagram - Mast', color='#fff')
+    ax1.grid(True, alpha=0.2, color='#555')
+    
+    # BMD
+    ax2.set_facecolor('#1e1e2e')
+    ax2.plot(M, h, 'r-', linewidth=2)
+    ax2.fill_betweenx(h, M, alpha=0.3, color='red')
+    ax2.set_xlabel('Moment M (kN·m)', color='#aaa')
+    ax2.set_ylabel('Height (m)', color='#aaa')
+    ax2.set_title('Bending Moment Diagram - Mast', color='#fff')
+    ax2.grid(True, alpha=0.2, color='#555')
+    
+    for ax in (ax1, ax2):
+        ax.tick_params(colors='#888')
+        for spine in ax.spines.values():
+            spine.set_color('#555')
+    
+    buf = plt.BytesIO()
+    fig.savefig(buf, format='png', dpi=150, bbox_inches='tight', facecolor='#1e1e2e')
+    buf.seek(0)
+    import base64
+    return base64.b64encode(buf.read()).decode()
