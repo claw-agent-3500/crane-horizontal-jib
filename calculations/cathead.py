@@ -1,230 +1,278 @@
 """
-Cathead (Turntable/Slewing Assembly) Structural Analysis
+Cathead (Turntable) Structural Analysis
 
-Load transfer path:
-  Jib + Counterjib → Cathead (apex) → Slewing bearing → Tower → Foundation
+The cathead is the horizontal truss structure at crane apex:
+- Connects jib and counterjib at pivot point
+- Supports trolley on jib side
+- Transfers all loads to slewing bearing
 
-Forces transferred:
-  - Fz: Vertical (gravity, payload)
-  - Fx: Horizontal along jib axis
-  - Fy: Horizontal perpendicular (wind)
-  - Mz: Torque around vertical (slewing moment)
-  - My: Moment around horizontal (tipping)
+Structure: Similar to jib (truss with sections, self-weight, wind area)
 """
 
 import numpy as np
-from dataclasses import dataclass
-from typing import Optional
+from dataclasses import dataclass, field
+from typing import List, Optional
+from models import (
+    CraneModel, Section, PointLoad, UDL, Trolley, LoadCase,
+    TrussConfig, DiagonalConfig
+)
 
 
 @dataclass
-class CatheadLoads:
-    """Loads transferred through cathead to slewing bearing."""
-    # Forces
-    Fx: float = 0.0  # kN - along jib direction
-    Fy: float = 0.0  # kN - perpendicular to jib
-    Fz: float = 0.0  # kN - vertical
+class CatheadConfig:
+    """Configuration for cathead structural analysis."""
+    length: float = 0.0  # Total cathead length (m)
+    height: float = 0.0  # Height above tower (m)
+    width: float = 0.0  # Width of truss (m)
     
-    # Moments
-    Mx: float = 0.0  # kN·m - around jib axis
-    My: float = 0.0  # kN·m - tipping moment
-    Mz: float = 0.0  # kN·m - slewing torque
+    # Structural properties
+    sections: List[Section] = field(default_factory=list)
+    truss_config: Optional[TrussConfig] = None
     
-    # Location
-    cathead_height: float = 0.0  # m - height above tower
+    # Self-weight (kN)
+    self_weight: float = 0.0
+    
+    # Wind area (m²)
+    wind_area: float = 0.0
+    
+    # CG coordinates (from pivot point)
+    cg_x: float = 0.0  # m from pivot (jib side positive)
+    cg_y: float = 0.0  # m above pivot
+    cg_z: float = 0.0  # m from centerline
 
 
-@dataclass
-class SlewingBearingLoads:
-    """Loads on slewing bearing."""
-    # Total reactions
-    Fz_total: float = 0.0  # kN - total vertical
-    Fx_total: float = 0.0  # kN - horizontal
-    Fy_total: float = 0.0  # kN - perpendicular
-    
-    # Moment about bearing center
-    Mx_total: float = 0.0  # kN·m
-    My_total: float = 0.0  # kN·m
-    Mz_total: float = 0.0  # kN·m
-    
-    # Bearing geometry
-    bearing_diameter: float = 0.0  # m
-    bolt_circle_diameter: float = 0.0  # m
-    
-    # Max bolt load (for check)
-    max_bolt_load: float = 0.0  # kN
-
-
-def compute_cathead_from_jib_counterjib(
-    jib_result,
-    counterjib_result,
-    jib_length: float,
-    counterjib_length: float,
-    cathead_height: float = 0.0,
-    jib_elev_angle: float = 0.0,  # degrees, jib elevation
-) -> CatheadLoads:
+def create_cathead_model(
+    length: float,
+    height: float = 0.0,
+    width: float = 1.5,
+    self_weight: float = 50.0,
+    wind_area: float = 8.0,
+    cg_offset: float = 1.0,  # CG offset from center
+    youngs_modulus: float = 200000.0,  # MPa
+    yield_strength: float = 345.0,  # MPa
+) -> CraneModel:
     """
-    Compute loads at cathead from jib and counterjib analysis.
-    
-    The cathead is at the pivot point where jib and counterjib meet.
+    Create CraneModel for cathead structural analysis.
     """
-    # Get reaction forces at root (cathead connection)
-    # For jib: moment at root = reaction moment
-    M_jib = np.max(np.abs(jib_result.M)) if hasattr(jib_result, 'M') else 0
+    # Calculate average weight per length
+    weight_per_m = self_weight / length if length > 0 else 0
     
-    # For counterjib: moment at root
-    M_counter = np.max(np.abs(counterjib_result.M)) if hasattr(counterjib_result, 'M') else 0
+    # Default sections
+    sections = [
+        Section(
+            name='Root',
+            start=0.0,
+            end=length * 0.2,
+            weight_per_length=weight_per_m * 0.6,
+            area=0.02,
+            moment_of_inertia=0.005,
+            height=width,
+            yield_strength=yield_strength,
+        ),
+        Section(
+            name='Mid',
+            start=length * 0.2,
+            end=length * 0.8,
+            weight_per_length=weight_per_m,
+            area=0.025,
+            moment_of_inertia=0.006,
+            height=width,
+            yield_strength=yield_strength,
+        ),
+        Section(
+            name='Tip',
+            start=length * 0.8,
+            end=length,
+            weight_per_length=weight_per_m * 0.6,
+            area=0.02,
+            moment_of_inertia=0.005,
+            height=width,
+            yield_strength=yield_strength,
+        ),
+    ]
     
-    # Shear forces
-    V_jib = np.max(np.abs(jib_result.V)) if hasattr(jib_result, 'V') else 0
-    V_counter = np.max(np.abs(counterjib_result.V)) if hasattr(counterjib_result, 'V') else 0
+    # Self-weight as UDL
+    udls = [
+        UDL(
+            name='self_weight',
+            start=0.0,
+            end=length,
+            magnitude=weight_per_m,
+        ),
+    ]
     
-    # Vertical forces (self-weight + payload)
-    Fz_jib = V_jib  # Approx vertical reaction
-    Fz_counter = V_counter
+    # No point loads (trolley is on jib, not cathead)
+    point_loads = []
     
-    # Total vertical = sum of both arms
-    Fz_total = Fz_jib + Fz_counter
+    # Create model
+    model = CraneModel(
+        name='Cathead',
+        jib_length=length,
+        jib_height_position=height,
+        sections=sections,
+        point_loads=point_loads,
+        udls=udls,
+        youngs_modulus=youngs_modulus,
+        load_cases=[
+            LoadCase(
+                name='Cathead Load',
+                coefficients={'self_weight': 1.0},
+            ),
+        ],
+    )
     
-    # Tipping moment = sum of moments from both arms
-    # Jib creates moment in one direction, counterjib in opposite
-    # Net My depends on which is larger
-    My = abs(M_jib - M_counter)  # kN·m
+    # Store CG info
+    model.cg_x = cg_offset
+    model.cg_y = height
+    model.cg_z = 0.0
+    model.wind_area = wind_area
     
-    # Slewing moment Mz - from eccentric loads during rotation
-    # Approx as 5% of max moment for now
-    Mz = 0.05 * max(M_jib, M_counter)  # kN·m
+    return model
+
+
+def compute_cathead_wind_load(
+    cathead_model: CraneModel,
+    wind_pressure: float,  # Pa
+) -> float:
+    """
+    Compute wind force on cathead.
     
-    # Horizontal forces from wind
-    Fx = 0.0  # Along jib - from wind on jib
-    Fy = 0.0  # Perpendicular - wind on sides
+    F_wind = pressure × area × Cd
+    """
+    # Drag coefficient for truss ~1.2
+    Cd = 1.2
     
-    # Axial moment (around jib axis) - from trolley position
-    Mx = 0.0
+    area = getattr(cathead_model, 'wind_area', 8.0)  # m²
     
-    return CatheadLoads(
-        Fx=Fx,
-        Fy=Fy,
-        Fz=Fz_total,
-        Mx=Mx,
-        My=My,
-        Mz=Mz,
-        cathead_height=cathead_height,
+    return wind_pressure * area * Cd / 1000  # kN
+
+
+def analyze_cathead(config: CatheadConfig, load_case: LoadCase = None):
+    """
+    Analyze cathead structure.
+    """
+    from crane_calc import run_analysis
+    
+    # Create model
+    model = create_cathead_model(
+        length=config.length,
+        height=config.height,
+        width=config.truss_config.height if config.truss_config else 1.5,
+        self_weight=config.self_weight,
+        wind_area=config.wind_area,
+        cg_offset=config.cg_x,
+    )
+    
+    # Run analysis
+    result = run_analysis(model)
+    
+    return model, result
+
+
+# Standard cathead sizes per crane class
+CATHEAD_CONFIGS = {
+    'TC7030-12': {
+        'length': 6.0,
+        'self_weight': 45.0,  # kN
+        'wind_area': 7.0,  # m²
+        'cg_offset': 0.5,  # m from center
+    },
+    'TC7030-15': {
+        'length': 7.0,
+        'self_weight': 55.0,
+        'wind_area': 8.5,
+        'cg_offset': 0.6,
+    },
+    'TC7030-18': {
+        'length': 8.0,
+        'self_weight': 65.0,
+        'wind_area': 10.0,
+        'cg_offset': 0.7,
+    },
+}
+
+
+def get_cathead_for_crane(crane_name: str, custom: dict = None) -> CraneModel:
+    """
+    Get appropriate cathead model for crane type.
+    """
+    config = CATHEAD_CONFIGS.get(crane_name, CATHEAD_CONFIGS['TC7030-12'])
+    
+    if custom:
+        config.update(custom)
+    
+    return create_cathead_model(
+        length=config['length'],
+        self_weight=config['self_weight'],
+        wind_area=config['wind_area'],
+        cg_offset=config['cg_offset'],
     )
 
 
-def compute_slewing_bearing_reactions(
-    cathead: CatheadLoads,
-    tower_height: float,
-    bearing_diameter: float = 2.0,  # m typical
-) -> SlewingBearingLoads:
-    """
-    Compute reactions at slewing bearing from cathead loads.
-    
-    The slewing bearing connects upper (rotating) to lower (stationary) structure.
-    """
-    # Total vertical force
-    Fz = cathead.Fz
-    
-    # Horizontal forces transferred to bearing
-    Fx = cathead.Fx
-    Fy = cathead.Fy
-    
-    # Moments about bearing center
-    # My (tipping) creates vertical reaction differential
-    # Mz (slewing) creates horizontal reaction differential
-    
-    Mx = cathead.Mx
-    My = cathead.My
-    Mz = cathead.Mz
-    
-    # Bolt circle diameter (typically 0.8 × bearing diameter)
-    bolt_circle = 0.8 * bearing_diameter
-    
-    # Max bolt load calculation (simplified)
-    # For tipping moment My: max bolt load = My / (bolt_circle × n_bolts)
-    # Assuming 24 bolts on circle
-    n_bolts = 24
-    if bolt_circle > 0:
-        max_bolt = My / (bolt_circle * n_bolts) if My > 0 else 0
-        # Add safety factor
-        max_bolt *= 1.5
-    else:
-        max_bolt = 0
-    
-    return SlewingBearingLoads(
-        Fz_total=Fz,
-        Fx_total=Fx,
-        Fy_total=Fy,
-        Mx_total=Mx,
-        My_total=My,
-        Mz_total=Mz,
-        bearing_diameter=bearing_diameter,
-        bolt_circle_diameter=bolt_circle,
-        max_bolt_load=max_bolt,
-    )
-
-
-def compute_tower_base_reactions(
-    bearing_reactions: SlewingBearingLoads,
-    tower_height: float,
-    tower_self_weight: float = 0.0,  # kN
-) -> dict:
-    """
-    Compute reactions at tower base / foundation.
-    
-    Loads transfer through tower to foundation.
-    """
-    # Vertical at base = bearing vertical + tower self-weight
-    Fz_base = bearing_reactions.Fz_total + tower_self_weight
-    
-    # Horizontal at base = bearing horizontals
-    Fx_base = bearing_reactions.Fx_total
-    Fy_base = bearing_reactions.Fy_total
-    
-    # Moments at base = bearing moments + horizontal × tower height
-    Mx_base = bearing_reactions.Mx_total + bearing_reactions.Fy_total * tower_height
-    My_base = bearing_reactions.My_total + bearing_reactions.Fx_total * tower_height
-    Mz_base = bearing_reactions.Mz_total
-    
-    return {
-        'Fx': Fx_base,  # kN
-        'Fy': Fy_base,  # kN
-        'Fz': Fz_base,  # kN
-        'Mx': Mx_base,  # kN·m
-        'My': My_base,  # kN·m
-        'Mz': Mz_base,  # kN·m
-    }
-
-
-def analyze_full_load_path(
+def compute_load_path(
     jib_result,
     counterjib_result,
-    jib_length: float,
-    counterjib_length: float,
+    cathead_result,
     tower_height: float = 30.0,
     bearing_diameter: float = 2.0,
-    cathead_height: float = 0.0,
-    tower_weight: float = 0.0,
 ) -> dict:
     """
-    Complete load path analysis: Jib → Cathead → Bearing → Tower → Foundation
+    Compute complete load path with proper cathead analysis.
     """
-    # Step 1: Cathead loads
-    cathead = compute_cathead_from_jib_counterjib(
-        jib_result, counterjib_result,
-        jib_length, counterjib_length,
-        cathead_height,
+    # Vertical loads
+    Fz_jib = np.max(np.abs(jib_result.V)) if hasattr(jib_result, 'V') else 0
+    Fz_counter = np.max(np.abs(counterjib_result.V)) if hasattr(counterjib_result, 'V') else 0
+    Fz_cathead = np.max(np.abs(cathead_result.V)) if hasattr(cathead_result, 'V') else 0
+    
+    Fz_total = Fz_jib + Fz_counter + Fz_cathead
+    
+    # Moments from jib and counterjib at pivot
+    M_jib = np.max(np.abs(jib_result.M))
+    M_counter = np.max(np.abs(counterjib_result.M))
+    M_cathead = np.max(np.abs(cathead_result.M))
+    
+    # Net tipping moment at bearing
+    My = abs(M_jib - M_counter) + M_cathead
+    
+    # Slewing moment (approximate)
+    Mz = 0.05 * max(M_jib, M_counter)
+    
+    # Max stress check
+    max_stress = max(
+        np.max(jib_result.sigma),
+        np.max(counterjib_result.sigma),
+        np.max(cathead_result.sigma),
     )
     
-    # Step 2: Slewing bearing reactions
-    bearing = compute_slewing_bearing_reactions(cathead, tower_height, bearing_diameter)
-    
-    # Step 3: Tower base / foundation reactions
-    foundation = compute_tower_base_reactions(bearing, tower_height, tower_weight)
+    # Max utilization
+    max_util = max_stress / 345.0 * 100
     
     return {
-        'cathead': cathead,
-        'bearing': bearing,
-        'foundation': foundation,
+        'vertical_load_kN': Fz_total,
+        'tipping_moment_kNm': My,
+        'slewing_moment_kNm': Mz,
+        'max_stress_MPa': max_stress,
+        'max_utilization_percent': max_util,
+        'bearing_load_kN': Fz_total,
+        'bearing_moment_kNm': My,
     }
+
+
+def print_load_path_summary(load_path: dict):
+    """Print formatted load path summary."""
+    print("=" * 60)
+    print("COMPLETE LOAD PATH")
+    print("=" * 60)
+    print(f"\n📍 CATHEAD → SLEWING BEARING")
+    print(f"   Vertical: {load_path['vertical_load_kN']:.0f} kN")
+    print(f"   Tipping Moment: {load_path['tipping_moment_kNm']:.0f} kN·m")
+    print(f"   Slewing Moment: {load_path['slewing_moment_kNm']:.0f} kN·m")
+    
+    print(f"\n🔄 SLEWING BEARING → FOUNDATION")
+    print(f"   Vertical: {load_path['bearing_load_kN']:.0f} kN")
+    print(f"   Moment: {load_path['bearing_moment_kNm']:.0f} kN·m")
+    
+    print(f"\n📊 STRESS CHECK")
+    print(f"   Max Stress: {load_path['max_stress_MPa']:.0f} MPa")
+    print(f"   Max Utilization: {load_path['max_utilization_percent']:.1f}%")
+    print("=" * 60)
