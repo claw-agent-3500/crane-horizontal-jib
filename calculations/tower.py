@@ -414,3 +414,41 @@ def compute_diagonal_fatigue(
         'damage': damage,
         'safe_life_years': safe_life,
     }
+
+
+def compute_slewing_fatigue(
+    jib_moment_kNm: float = 10981,
+    section_modulus: float = 0.022,
+    slewing_cycles_per_year: int = 10000,
+    wind_cycles_per_year: int = 5000,
+) -> dict:
+    """Compute fatigue from slewing rotation."""
+    # Convert moment to stress
+    M_Nm = jib_moment_kNm * 1000
+    sigma_max = (M_Nm / section_modulus) / 1e6
+    sigma_min = -sigma_max
+    
+    delta_sigma = abs(sigma_max - sigma_min)
+    
+    log_a = 15.0
+    m = 5.0
+    
+    total_cycles = slewing_cycles_per_year + wind_cycles_per_year
+    
+    if delta_sigma > 0:
+        log_N = (np.log10(delta_sigma) * m - log_a) / m
+        N_allow = 10 ** log_N if log_N > 0 else float('inf')
+    else:
+        N_allow = float('inf')
+    
+    damage = total_cycles / N_allow if N_allow > 0 else 0
+    safe_life = 1.0 / damage if damage > 0 else float('inf')
+    
+    return {
+        'stress_range_MPa': delta_sigma,
+        'total_cycles': total_cycles,
+        'N_allowable': N_allow,
+        'damage': damage,
+        'safe_life_years': safe_life,
+    }
+

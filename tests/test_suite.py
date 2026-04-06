@@ -592,6 +592,14 @@ def test_mast_fatigue():
     return True
 
 
+
+def test_slewing_fatigue():
+    from calculations.tower import compute_slewing_fatigue
+    result = compute_slewing_fatigue(jib_moment_kNm=10981)
+    print(f"✅ Slewing fatigue: stress range={result['stress_range_MPa']:.0f}MPa, cycles={result['total_cycles']:,}")
+    return True
+
+
 def main():
     """Run all tests."""
     print("\n" + "=" * 60)
@@ -636,6 +644,8 @@ def main():
     results["mast_deflection"] = test_mast_deflection()
 
     results["mast_fatigue"] = test_mast_fatigue()
+
+    results["slewing_fatigue"] = test_slewing_fatigue()
     
     # Summary
     print("\n" + "=" * 60)
