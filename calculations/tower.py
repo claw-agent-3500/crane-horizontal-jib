@@ -309,3 +309,108 @@ def compute_mast_deflection_v2(
         'limit_mm': limit,
         'passes': max_delta < limit,
     }
+
+
+def compute_mast_fatigue(
+    tower_result: dict,
+    cycles_per_year: int = 20000,
+    detail_category: str = 'D',  # Welded steel detail category
+) -> dict:
+    """
+    Compute fatigue damage for mast structure.
+    
+    For tower crane mast:
+    - Main chords (vertical): stress range from axial + bending
+    - Diagonal chords: stress range from shear + torsion
+    - Connections: stress concentration at welds
+    
+    Args:
+        tower_result: Result from analyze_tower()
+        cycles_per_year: Estimated load cycles per year
+        detail_category: 'D' typical for welded steel (log_a=17, m=5)
+    
+    Returns:
+        Fatigue damage results
+    """
+    # S-N curve parameters (detail category)
+    log_a_map = {'A': 18.0, 'B': 17.0, 'C': 16.0, 'D': 15.0, 'E': 14.0, 'F': 13.0}
+    log_a = log_a_map.get(detail_category, 15.0)
+    m = 5.0  # Slope
+    
+    results = []
+    
+    for sec in tower_result['sections']:
+        # Stress range = max stress - min stress (assuming min = 0 for simplicity)
+        sigma_max = sec['sigma']
+        delta_sigma = sigma_max  # Assuming tension-compression cycle
+        
+        # Allowable cycles at this stress range
+        if delta_sigma > 0:
+            log_N = (np.log10(delta_sigma) * m - log_a) / m
+            N_allow = 10 ** log_N if log_N > 0 else float('inf')
+        else:
+            N_allow = float('inf')
+        
+        # Damage ratio
+        if N_allow == float('inf') or N_allow <= 0:
+            damage = 0.0
+        else:
+            damage = cycles_per_year / N_allow
+        
+        # Safe life
+        safe_life = 1.0 / damage if damage > 0 else float('inf')
+        
+        results.append({
+            'section': sec['section'],
+            'height': sec['height'],
+            'stress_range_MPa': delta_sigma,
+            'cycles_per_year': cycles_per_year,
+            'N_allowable': N_allow,
+            'damage': damage,
+            'safe_life_years': safe_life,
+        })
+    
+    max_damage = max(r['damage'] for r in results) if results else 0
+    min_life = min(r['safe_life_years'] for r in results) if results else float('inf')
+    
+    return {
+        'sections': results,
+        'max_damage': max_damage,
+        'min_safe_life_years': min_life,
+        'failed': max_damage > 1.0,
+    }
+
+
+def compute_diagonal_fatigue(
+    tower_sections: list,
+    diagonal_force_range: float,  # kN range for diagonals
+) -> dict:
+    """
+    Compute fatigue for diagonal members.
+    
+    Diagonals see alternating compression/tension from wind/loading cycles.
+    """
+    # Simplified: assume diagonal stress proportional to force
+    A_diagonal = 0.005  # m² average diagonal area
+    sigma_range = (diagonal_force_range * 1000) / (A_diagonal * 1e6)  # MPa
+    
+    # Same S-N curve approach
+    log_a = 15.0  # Detail category D
+    m = 5.0
+    
+    cycles_per_year = 20000
+    
+    if sigma_range > 0:
+        log_N = (np.log10(sigma_range) * m - log_a) / m
+        N_allow = 10 ** log_N if log_N > 0 else float('inf')
+    else:
+        N_allow = float('inf')
+    
+    damage = cycles_per_year / N_allow if N_allow > 0 else 0
+    safe_life = 1.0 / damage if damage > 0 else float('inf')
+    
+    return {
+        'diagonal_stress_range_MPa': sigma_range,
+        'damage': damage,
+        'safe_life_years': safe_life,
+    }

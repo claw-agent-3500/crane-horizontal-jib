@@ -573,6 +573,25 @@ def test_mast_deflection():
     return True
 
 
+
+def test_mast_fatigue():
+    from calculations.tower import CranePartLoad, create_tower_sections, analyze_tower, compute_mast_fatigue
+    from calculations.counterjib import analyze_complete_crane
+    import numpy as np
+    
+    crane = analyze_complete_crane("examples/working_60m/input.yaml")
+    parts = [
+        CranePartLoad(name="Jib", weight_kN=150, cg_height=75, moment_My=np.max(np.abs(crane["jib"]["result"].M))),
+        CranePartLoad(name="Counterjib", weight_kN=80, cg_height=52.5, moment_My=-np.max(np.abs(crane["counterjib"]["result"].M))),
+    ]
+    tower = create_tower_sections(15)
+    result = analyze_tower(parts, tower)
+    
+    fatigue = compute_mast_fatigue(result, cycles_per_year=20000)
+    print(f"✅ Mast fatigue: max damage={fatigue['max_damage']:.6f}, safe life={fatigue['min_safe_life_years']:.0f} years")
+    return True
+
+
 def main():
     """Run all tests."""
     print("\n" + "=" * 60)
@@ -615,6 +634,8 @@ def main():
 
     results["tower"] = test_tower_analysis()
     results["mast_deflection"] = test_mast_deflection()
+
+    results["mast_fatigue"] = test_mast_fatigue()
     
     # Summary
     print("\n" + "=" * 60)
