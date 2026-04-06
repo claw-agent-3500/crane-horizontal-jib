@@ -452,3 +452,95 @@ def compute_slewing_fatigue(
         'safe_life_years': safe_life,
     }
 
+
+
+def compute_slewing_fatigue_by_condition(
+    jib_moment_kNm: float,
+    section_modulus: float = 0.022,
+    condition: str = 'in_service',  # 'in_service', 'working', 'storm', 'survival'
+) -> dict:
+    """
+    Compute slewing fatigue for different service conditions.
+    
+    Conditions:
+    - in_service: Normal operation, 10000 slewing cycles/year
+    - working: Heavy use, 20000 cycles/year  
+    - storm: High wind, reduced cycles but higher moment
+    - survival: Extreme, 0 cycles but max stress
+    
+    Returns fatigue results for each condition.
+    """
+    conditions = {
+        'in_service': {
+            'name': 'In Service (Normal)',
+            'slewing_cycles': 10000,
+            'wind_cycles': 5000,
+            'moment_factor': 1.0,
+        },
+        'working': {
+            'name': 'Heavy Working',
+            'slewing_cycles': 20000,
+            'wind_cycles': 10000,
+            'moment_factor': 1.2,
+        },
+        'storm': {
+            'name': 'Storm Condition',
+            'slewing_cycles': 1000,
+            'wind_cycles': 500,
+            'moment_factor': 1.5,  # higher due to wind
+        },
+        'survival': {
+            'name': 'Survival (No slewing)',
+            'slewing_cycles': 0,
+            'wind_cycles': 50,
+            'moment_factor': 2.0,  # max wind
+        },
+    }
+    
+    cfg = conditions.get(condition, conditions['in_service'])
+    
+    # Adjust moment based on condition
+    M_effective = jib_moment_kNm * cfg['moment_factor']
+    
+    # Compute stress
+    M_Nm = M_effective * 1000
+    sigma_max = (M_Nm / section_modulus) / 1e6
+    sigma_min = -sigma_max
+    delta_sigma = abs(sigma_max - sigma_min)
+    
+    # S-N curve
+    log_a = 15.0
+    m = 5.0
+    
+    total_cycles = cfg['slewing_cycles'] + cfg['wind_cycles']
+    
+    if delta_sigma > 0 and total_cycles > 0:
+        log_N = (np.log10(delta_sigma) * m - log_a) / m
+        N_allow = 10 ** log_N if log_N > 0 else float('inf')
+    else:
+        N_allow = float('inf')
+    
+    damage = total_cycles / N_allow if N_allow > 0 else 0
+    safe_life = 1.0 / damage if damage > 0 else float('inf')
+    
+    return {
+        'condition': cfg['name'],
+        'slewing_cycles': cfg['slewing_cycles'],
+        'wind_cycles': cfg['wind_cycles'],
+        'moment_factor': cfg['moment_factor'],
+        'stress_range_MPa': delta_sigma,
+        'total_cycles': total_cycles,
+        'N_allowable': N_allow,
+        'damage': damage,
+        'safe_life_years': safe_life,
+    }
+
+
+def compute_all_condition_fatigue(jib_moment_kNm: float) -> dict:
+    """Compute fatigue for all service conditions."""
+    results = {}
+    for condition in ['in_service', 'working', 'storm', 'survival']:
+        results[condition] = compute_slewing_fatigue_by_condition(
+            jib_moment_kNm, condition=condition
+        )
+    return results
