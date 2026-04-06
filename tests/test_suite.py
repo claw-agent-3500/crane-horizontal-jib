@@ -533,6 +533,46 @@ def test_counterjib_analysis():
     return True
 
 
+
+def test_tower_analysis():
+    from calculations.tower import CranePartLoad, create_tower_sections, analyze_tower
+    from calculations.counterjib import analyze_complete_crane
+    from calculations.cathead import get_cathead_for_crane
+    from crane_calc import run_analysis
+    import numpy as np
+    
+    crane = analyze_complete_crane('examples/working_60m/input.yaml')
+    cathead = get_cathead_for_crane('TC7030-12')
+    cathead_result = run_analysis(cathead)
+    
+    parts = [
+        CranePartLoad(name="Jib", weight_kN=150, cg_height=75, moment_My=np.max(np.abs(crane["jib"]["result"].M))),
+        CranePartLoad(name="Counterjib", weight_kN=80, cg_height=52.5, moment_My=-np.max(np.abs(crane["counterjib"]["result"].M))),
+        CranePartLoad(name="Cathead", weight_kN=45, cg_height=45, moment_My=np.max(np.abs(cathead_result.M))),
+    ]
+    
+    tower = create_tower_sections(15)
+    result = analyze_tower(parts, tower)
+    print("✅ Tower: " + str(round(result["max_util"],1)) + "% max utilization")
+    return True
+
+
+def test_mast_deflection():
+    from calculations.tower import CranePartLoad, create_tower_sections, compute_mast_deflection_v2
+    from calculations.counterjib import analyze_complete_crane
+    import numpy as np
+    
+    crane = analyze_complete_crane("examples/working_60m/input.yaml")
+    parts = [
+        CranePartLoad(name="Jib", weight_kN=150, cg_height=75, moment_My=np.max(np.abs(crane["jib"]["result"].M))),
+        CranePartLoad(name="Counterjib", weight_kN=80, cg_height=52.5, moment_My=-np.max(np.abs(crane["counterjib"]["result"].M))),
+    ]
+    tower = create_tower_sections(15)
+    result = compute_mast_deflection_v2(parts, tower)
+    print("✅ Mast deflection: " + str(round(result["max_deflection_mm"],2)) + "mm (limit " + str(round(result["limit_mm"],0)) + "mm)")
+    return True
+
+
 def main():
     """Run all tests."""
     print("\n" + "=" * 60)
@@ -572,6 +612,9 @@ def main():
     results["optimization"] = test_section_optimization()
     # results["json_export"] = test_json_export()
     results["counterjib"] = test_counterjib_analysis()  # Skip - takes too long
+
+    results["tower"] = test_tower_analysis()
+    results["mast_deflection"] = test_mast_deflection()
     
     # Summary
     print("\n" + "=" * 60)
