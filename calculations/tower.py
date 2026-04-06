@@ -192,3 +192,120 @@ def plot_mast_sfd_bmd(mast_results: dict) -> str:
     buf.seek(0)
     import base64
     return base64.b64encode(buf.read()).decode()
+
+
+def compute_mast_deflection(
+    parts: List[CranePartLoad],
+    sections: List[TowerSection],
+    E: float = 200000.0,  # MPa (Young's modulus)
+    wind_pressure: float = 0.0,  # Pa
+) -> dict:
+    """
+    Compute deflection along mast with distributed and point loads.
+    
+    Loads:
+    - Distributed: wind pressure on mast sections
+    - Point: loads from upper structure at cathead level
+    """
+    n = len(sections)
+    heights = np.array([s.end_height for s in sections])
+    delta = np.zeros(n)
+    
+    # Average section properties
+    I_avg = np.mean([s.moment_of_inertia for s in sections])
+    
+    # Convert I from m⁴ to mm⁴ for MPa units
+    I_mm4 = I_avg * 1e12
+    
+    for i in range(n):
+        h = heights[i]
+        
+        # 1. Point load moment from upper structure (at cathead level ~45m)
+        # This causes tip deflection at the top, but we calculate at each height
+        # For a cantilever, deflection at point x due to moment at end:
+        # δ = M * x² / (2EI) for point moment at end
+        
+        point_load_M = sum(p.moment_My for p in parts if p.cg_height > h)
+        
+        # Deflection from point moment at cathead
+        if h > 0 and I_mm4 > 0:
+            x = h  # distance from base
+            delta_point = (point_load_M * 1000 * x**2) / (2 * E * I_mm4)  # mm
+        else:
+            delta_point = 0
+        
+        # 2. Distributed wind load
+        # q = wind pressure × area per meter
+        q_total = 0
+        for sec in sections:
+            q_total += sec.wind_area_per_m * sec.length
+        q_avg = q_total / sum(s.length for s in sections)  # m²/m
+        
+        wind_load = wind_pressure * q_avg / 1000 if wind_pressure > 0 else 0  # kN/m
+        
+        # Deflection from distributed load (cantilever):
+        # δ = q * x⁴ / (8EI)
+        if h > 0 and I_mm4 > 0:
+            delta_wind = (wind_load * 1000 * h**4) / (8 * E * I_mm4)  # mm
+        else:
+            delta_wind = 0
+        
+        delta[i] = delta_point + delta_wind
+    
+    # Serviceability check
+    max_deflection = np.max(np.abs(delta))
+    L = sections[-1].end_height if sections else 45
+    limit = L / 250  # typical limit
+    
+    return {
+        'heights': heights.tolist(),
+        'deflection_mm': delta.tolist(),
+        'max_deflection_mm': max_deflection,
+        'serviceability_limit': f'L/250 = {limit:.0f}mm',
+        'passes': max_deflection < limit,
+    }
+
+
+def compute_mast_deflection_v2(
+    parts: List[CranePartLoad],
+    sections: List[TowerSection],
+    E: float = 200000.0,  # MPa
+) -> dict:
+    """
+    Compute mast deflection - corrected formula.
+    
+    δ = M * x² / (2EI) for point moment at end of cantilever
+    """
+    results = []
+    
+    # Use average I
+    I_avg = sum(s.moment_of_inertia for s in sections) / len(sections)
+    I_mm4 = I_avg * 1e12
+    
+    for sec in sections:
+        h = sec.end_height
+        
+        # Sum of moments from parts above this height
+        M_total = sum(p.moment_My for p in parts if p.cg_height > h)
+        
+        if h > 0 and I_mm4 > 0:
+            delta_mm = (M_total * 1000 * (h*1000)**2) / (2 * E * I_mm4)
+        else:
+            delta_mm = 0
+        
+        results.append({
+            'height': h,
+            'moment_kNm': M_total,
+            'deflection_mm': delta_mm,
+        })
+    
+    max_delta = max(r['deflection_mm'] for r in results)
+    L = sections[-1].end_height if sections else 45
+    limit = L / 250 * 1000  # mm
+    
+    return {
+        'results': results,
+        'max_deflection_mm': max_delta,
+        'limit_mm': limit,
+        'passes': max_delta < limit,
+    }
