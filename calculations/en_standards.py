@@ -62,3 +62,153 @@ def buckling_en(N_kN, L_m, A_m2, I_m4, fy_MPa=345):
     chi = 1.0 / (phi + np.sqrt(phi**2 - (lam/100)**2))
     N_bd = chi * A_m2 * 1e6 * (fy_MPa/1.25) / 1000
     return {'N_cr_kN': N_cr, 'chi': chi, 'N_bd_kN': N_bd, 'util': N_kN/N_bd, 'pass': N_kN/N_bd < 1.0}
+
+# =============================================================================
+# FEM 1.001 - European Federation of Materials Handling Standards
+# =============================================================================
+# FEM 1.001: Rules for the design of cranes
+# FEM 1.002: Principles for crane structures
+# FEM 1.004: Classification and utilization
+# FEM L 02 100: Fatigue strength calculation method
+
+# FEM Classification of mechanisms (Table 1)
+FEM_MECHANISM_GROUPS = {
+    'T1': {'description': 'Light duty', ' utilization_factor': 0.25},
+    'T2': {'description': 'Medium duty', ' utilization_factor': 0.50},
+    'T3': {'description': 'Heavy duty', ' utilization_factor': 0.63},
+    'T4': {'description': 'Very heavy duty', ' utilization_factor': 0.75},
+    'T5': {'description': 'Continuous', ' utilization_factor': 1.00},
+    'T6': {'description': 'Severe continuous', ' utilization_factor': 1.25},
+    'T7': {'description': 'Intermittent periodic', ' utilization_factor': 1.60},
+    'T8': {'description': 'Continuous periodic', ' utilization_factor': 2.00},
+}
+
+# FEM fatigue classes (Table A.1)
+FEM_FATIGUE_CLASSES = {
+    'A': {'beta': 5, 'sigma_a': 140, 'description': 'Excellent (welded, polished)'},
+    'B': {'beta': 5, 'sigma_a': 112, 'description': 'Good (welded, machined)'},
+    'C': {'beta': 5, 'sigma_a': 90, 'description': 'Standard (welded, as-welded)'},
+    'D': {'beta': 5, 'sigma_a': 71, 'description': 'Low (welded, not treated)'},
+    'E': {'beta': 5, 'sigma_a': 56, 'description': 'Very low (welded, with notch)'},
+}
+
+
+def compute_fem_fatigue(sigma_max_MPa: float, sigma_min_MPa: float, 
+                       n_cycles: int, fem_class: str = 'C') -> dict:
+    """
+    Fatigue calculation per FEM L 02 100.
+    
+    Uses S-N curve with slope m = 5 (beta)
+    
+    N = (sigma_a / sigma_r)^m
+    
+    where:
+      sigma_a = allowable stress range
+      sigma_r = actual stress range
+      m = 5 (slope)
+    """
+    fc = FEM_FATIGUE_CLASSES.get(fem_class, FEM_FATIGUE_CLASSES['C'])
+    m = fc['beta']  # slope
+    sigma_a = fc['sigma_a']  # MPa
+    
+    # Stress range
+    sigma_r = abs(sigma_max_MPa - sigma_min_MPa)
+    
+    # Allowable cycles
+    if sigma_r > 0:
+        N_allow = (sigma_a / sigma_r) ** m
+    else:
+        N_allow = float('inf')
+    
+    # Damage
+    damage = n_cycles / N_allow if N_allow > 0 else 0
+    
+    # Safe life
+    safe_life_years = 1.0 / damage if damage > 0 and n_cycles > 0 else float('inf')
+    
+    return {
+        'sigma_range_MPa': sigma_r,
+        'n_cycles': n_cycles,
+        'N_allowable': N_allow,
+        'damage': damage,
+        'safe_life_years': safe_life_years,
+        'fem_class': fem_class,
+        'sigma_a_MPa': sigma_a,
+        'passes': damage < 1.0,
+    }
+
+
+def compute_fem_group(jib_length: float, swl_kN: float, tm_per_hour: float) -> str:
+    """
+    Determine FEM mechanism group based on:
+    - Jib length
+    - Safe Working Load (SWL)
+    - Operating time per hour
+    """
+    # Calculate utilization factor
+    # Based on class of crane and operating time
+    if tm_per_hour < 1:
+        return 'T1'
+    elif tm_per_hour < 2:
+        return 'T2'
+    elif tm_per_hour < 4:
+        return 'T3'
+    elif tm_per_hour < 8:
+        return 'T4'
+    elif tm_per_hour < 12:
+        return 'T5'
+    elif tm_per_hour < 16:
+        return 'T6'
+    elif tm_per_hour < 20:
+        return 'T7'
+    else:
+        return 'T8'
+
+
+def compute_fem_service_factor(swl_kN: float, actual_load_kN: float) -> dict:
+    """
+    FEM service factor calculation.
+    
+    k = S_actual / S_max
+    
+    Should be >= 1.0 for normal operation
+    """
+    k = actual_load_kN / swl_kN if swl_kN > 0 else 0
+    
+    return {
+        'swl_kN': swl_kN,
+        'actual_load_kN': actual_load_kN,
+        'service_factor': k,
+        'ok': k <= 1.0,
+    }
+
+
+def compute_fem_wind_operating_limit(
+    wind_speed_m_s: float,
+    jib_area_m2: float,
+    jib_weight_kN: float,
+) -> dict:
+    """
+    Calculate if crane can operate in given wind per FEM.
+    
+    Wind pressure: q = 0.5 * rho * v^2
+    """
+    rho = 1.225  # kg/m³ air density
+    
+    # Wind pressure
+    q = 0.5 * rho * wind_speed_m_s ** 2  # Pa
+    
+    # Wind force
+    F_wind = q * jib_area_m2 / 1000  # kN
+    
+    # Check against limit (typically 0.3 * SWL for operation)
+    swl = 120  # assume 120kN SWL
+    limit = 0.3 * swl
+    
+    return {
+        'wind_speed_m_s': wind_speed_m_s,
+        'wind_pressure_Pa': q,
+        'wind_force_kN': F_wind,
+        'operating_limit_kN': limit,
+        'can_operate': F_wind <= limit,
+    }
